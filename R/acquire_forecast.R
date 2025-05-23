@@ -33,7 +33,7 @@ acquire_forecast <- function(date) {
           
 
           # Define the latitude and longitude of interest
-          control_file_name <- "temp_grib_file"
+          control_file_name <- paste0("temp_grib_file",date)
           aws.s3::save_object(
             object = gefs_obj,
             bucket = "s3://noaa-gefs-pds/",
