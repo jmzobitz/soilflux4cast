@@ -16,11 +16,12 @@ acquire_forecast <- function(date) {
     dplyr::filter(terrestrial == 1)|> 
     dplyr::select(field_site_id,field_latitude,field_longitude)
   
+  
   # This set of code defines the possible outcomes and forecast horizons. We iterate throgh the resulting loop
   
   forecast_values <- expand_grid(forecast =  c("gec00",sprintf("gep%02d", 1:30)), 
                                  horizon = c("f000","f024")) |>
-    mutate(
+    dplyr::mutate(
       gefs_object = map2_chr(
         .x = forecast,
         .y = horizon,
@@ -48,7 +49,7 @@ acquire_forecast <- function(date) {
           soil_layers <- r[[grep("Soil Moisture|Soil Temperature", names(r), ignore.case = TRUE)]]
           
           # Extract value at the specified location - lots of if_else and a map
-          soil_value <- NEON_sites |>
+          soil_value <- site_data |>
             dplyr::mutate(soil_values = purrr::map2(.x = field_longitude, .y = field_latitude, , .f = ~ terra::extract(soil_layers, cbind(.x, .y)))) |>
             dplyr::mutate(forecast = purrr::map(soil_values, .f = ~ (.x |>
                                                                        tidyr::pivot_longer(cols = everything()) |>
@@ -72,8 +73,8 @@ acquire_forecast <- function(date) {
         }
       )
     ) |>
-    select(-gefs_object) |>
-    unnest(cols = c(values))
+    dplyr::select(-gefs_object) |>
+    tidyr::unnest(cols = c(values))
  
   return(forecast_values)
    
