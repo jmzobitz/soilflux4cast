@@ -29,7 +29,7 @@ acquire_forecast <- function(date) {
   # 6. Subset raster by desired variables (example here for the 4 variables)
   desired_vars <- c("PRES","TSOIL", "SOILW", "WEASD", "SNOD","ICETK")
   selected_layers <- lookup_table |>
-    filter(Parameter %in% desired_vars)
+    dplyr::filter(Parameter %in% desired_vars)
   
 
   
