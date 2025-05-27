@@ -13,12 +13,16 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
         
-      - name: Debug file paths
+      - name: Install system dependencies for terra
         run: |
-          echo "Current working directory:"
-          pwd
-          echo "Directory contents:"
-          ls -R
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgdal-dev \
+            libproj-dev \
+            libgeos-dev \
+            libudunits2-dev \
+            libcurl4-openssl-dev \
+            libxml2-dev
           
       - name: Set up R
         uses: r-lib/actions/setup-r@v2
