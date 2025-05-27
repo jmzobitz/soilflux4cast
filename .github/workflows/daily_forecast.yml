@@ -56,7 +56,7 @@ jobs:
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
-          git add data/drivers/observed_drivers.csv
+          git add data/drivers/observed_soil_drivers.csv
           git commit -m "Daily forecast update: $(date -u +"%Y-%m-%d")" || echo "No changes to commit"
           git push
         env:
