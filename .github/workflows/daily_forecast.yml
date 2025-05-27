@@ -12,7 +12,14 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
-
+        
+      - name: Debug file paths
+        run: |
+          echo "Current working directory:"
+          pwd
+          echo "Directory contents:"
+          ls -R
+          
       - name: Set up R
         uses: r-lib/actions/setup-r@v2
 
