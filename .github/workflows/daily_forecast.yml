@@ -37,11 +37,6 @@ jobs:
       - name: Restore R Packages
         run: Rscript -e 'renv::restore()'
 
-
-      - name: Install dependencies
-        run: |
-          Rscript -e 'install.packages(c("readr", "dplyr", "tidyr","rvest","purrr","aws.s3","terra"))'
-
       - name: Run forecast update script
         run: |
           Rscript -e '
