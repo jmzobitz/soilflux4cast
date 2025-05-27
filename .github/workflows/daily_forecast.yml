@@ -33,14 +33,14 @@ jobs:
           Rscript -e '
             source("R/acquire_forecast.R")
             input_date <- as.character(Sys.Date() - 1)
-            current_drivers <- readr::read_csv("data/drivers/observed_drivers.csv")
+            current_drivers <- readr::read_csv("data/drivers/observed_soil_drivers.csv")
             input_drivers <- acquire_forecast(input_date, forecast_vals = "gec00", forecast_horizon = "f000") |>
               dplyr::mutate(date = input_date) |>
               tidyr::pivot_wider() |>
               dplyr::relocate(date, field_site_id) |>
               dplyr::rename(site = field_site_id)
             out_drivers <- rbind(current_drivers, input_drivers)
-            readr::write_csv(out_drivers, file = "data/drivers/observed_drivers.csv")
+            readr::write_csv(out_drivers, file = "data/drivers/observed_soil_drivers.csv")
           '
 
       - name: Commit and push changes
