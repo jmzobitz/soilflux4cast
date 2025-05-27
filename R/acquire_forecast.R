@@ -1,6 +1,8 @@
 #' acquire_forecast Acquire the noon forecast cycle across all NEON sites at a given date.
 #'
 #' @param date specific day of the year in YYYY-MM-DD
+#' @param forecast_vals the type of forecast. Can be c("gec00",sprintf("gep%02d", 1:30))
+#' @param forecast_horizon how far out in the future will we run the forecast, can be f000, f024, f048, f072, f096, f120, f144, f168, f192, f216, f240, f264, f288, f312, f336, f360, f384
 #'
 #' @returns A nested data table with forecast (gec00 - control or gepXX - ensemble), horizon (f000 - current or f024 - 24 hours out), depth (where measurement is valid, meters), TSOIL (Kelvin), SOILW - soil water as a percent
 #' 
@@ -8,7 +10,10 @@
 #'
 #' @examples
 #' acquire_forecast("2024-01-01")
-acquire_forecast <- function(date) {
+acquire_forecast <- function(date,
+                             forecast_vals = c("gec00",sprintf("gep%02d", 1:30)),
+                             forecast_horizon = c("f000","f024")
+                             ) {
   
   
   # Acquire the NEON site_data 
@@ -35,15 +40,15 @@ acquire_forecast <- function(date) {
   
   # This set of code defines the possible outcomes and forecast horizons. We iterate throgh the resulting loop
   
-  forecast_values <- expand_grid(forecast =  c("gec00",sprintf("gep%02d", 1:30)), 
-                                 horizon = c("f000","f024")) |>
+  forecast_values <- tidyr::expand_grid(forecast =  forecast_vals, 
+                                 horizon = forecast_horizon) |>
     dplyr::mutate(
-      gefs_object = map2_chr(
+      gefs_object = purrr::map2_chr(
         .x = forecast,
         .y = horizon,
         .f = ~ paste0("gefs.", gsub("-", "", date), "/12/atmos/pgrb2ap5/", .x, ".t12z.pgrb2a.0p50.", .y)
       ), # Define the file name from AWS that we grab
-      values = map(
+      values = purrr::map(
         .x = gefs_object,
         .f = function(gefs_obj) {
           
