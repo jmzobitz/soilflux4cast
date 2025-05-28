@@ -28,7 +28,7 @@ input_drivers <- acquire_forecast(input_date, forecast_vals = "gec00", forecast_
   rename(site = field_site_id)
 
 # Append new data to existing data
-out_drivers <- bind_rows(current_drivers, input_drivers) |>
+out_drivers <- rbind(current_drivers, input_drivers) |>
   distinct()  # Remove any duplicate rows just in case
 
 # Write updated data back to CSV
