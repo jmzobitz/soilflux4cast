@@ -29,6 +29,7 @@ input_drivers <- acquire_forecast(input_date, forecast_vals = "gec00", forecast_
 
 # Append new data to existing data
 out_drivers <- rbind(current_drivers, input_drivers) |>
+  arrange(date,site) |> # Arrange by date and site alphabetically
   distinct()  # Remove any duplicate rows just in case
 
 # Write updated data back to CSV
