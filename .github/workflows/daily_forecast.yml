@@ -53,10 +53,12 @@ jobs:
           git add data/drivers/observed_soil_drivers.csv
           git commit -m "Daily forecast update: $(date -u +'%Y-%m-%d')" || echo "No changes to commit"
 
+          # 🔁 Move this up BEFORE the push
           git remote set-url origin https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git
           git remote -v
 
           git push origin $BRANCH
+
 
       - name: Create and merge pull request
         env:
