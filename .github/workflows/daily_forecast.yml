@@ -47,7 +47,7 @@ jobs:
           git checkout -B $BRANCH
           git add data/drivers/observed_soil_drivers.csv
           git commit -m "Daily forecast update: $(date -u +'%Y-%m-%d')" || echo "No changes to commit"
-          git push origin $BRANCH
+          git push https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git $BRANCH
 
       - name: Create pull request
         id: cpr
