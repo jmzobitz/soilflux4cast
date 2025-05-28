@@ -66,5 +66,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
-          gh pr create --base main --head daily-update --title "Auto PR: Forecast update $(date -u +'%Y-%m-%d')" --body "Automated forecast update."
-          gh pr merge --auto --squash
+          gh pr create --base main --head daily-update \
+            --title "Auto PR: Forecast update $(date -u +'%Y-%m-%d')" \
+            --body "Automated forecast update."
+
+          gh pr merge --squash --admin
