@@ -1,5 +1,9 @@
 name: Daily Forecast Update
 
+permissions:
+  contents: write
+  pull-requests: write
+
 on:
   schedule:
     - cron: '0 6 * * *'  # Run at 6 AM UTC every day
@@ -36,29 +40,27 @@ jobs:
       - name: Run daily forecast script
         run: Rscript scripts/daily_forecast.R
 
-      - name: Configure Git
+      - name: Configure Git with your user info
         run: |
-          git config --global user.name "github-actions"
-          git config --global user.email "github-actions@github.com"
-
+          git config --global user.name "jmzobitz"
+          git config --global user.email "zobitz@augsburg.edu"
 
       - name: Commit forecast update to branch
         run: |
           BRANCH="daily-update"
 
-          git config --global user.name "jmzobitz"
-          git config --global user.email "zobitz@augsburg.edu"
+          # Optional: Delete existing remote branch to avoid conflicts
+          git push origin --delete $BRANCH || echo "No existing remote branch to delete"
 
           git checkout -B $BRANCH
           git add data/drivers/observed_soil_drivers.csv
           git commit -m "Daily forecast update: $(date -u +'%Y-%m-%d')" || echo "No changes to commit"
 
-          # 🔁 Move this up BEFORE the push
           git remote set-url origin https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git
-          git remote -v
+          git push origin $BRANCH --force
 
-          git push origin $BRANCH
-
+      - name: Check GitHub CLI version
+        run: gh --version
 
       - name: Create and merge pull request
         env:
