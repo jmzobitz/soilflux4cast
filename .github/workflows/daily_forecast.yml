@@ -2,49 +2,45 @@ name: Daily Forecast Update
 
 on:
   schedule:
-    - cron: "0 6 * * *"  # Runs at 6:00 AM UTC daily
-  workflow_dispatch:
+    - cron: '0 6 * * *'  # Run at 6 AM UTC every day
+  workflow_dispatch:     # Allow manual trigger
 
 jobs:
   update-forecast:
     runs-on: ubuntu-latest
 
-    env:
-      TZ: UTC
-      RENV_CONFIG_SANDBOX_ENABLED: "FALSE"
-      RENV_CONFIG_REPOS_OVERRIDE: "https://cloud.r-project.org"
-
     steps:
-      - name: Checkout repository
+      - name: Checkout repo
         uses: actions/checkout@v3
 
       - name: Set up R
         uses: r-lib/actions/setup-r@v2
 
-      - name: Restore R packages with renv
+      - name: Install system dependencies for terra
         run: |
-          install.packages("renv")
-          Rscript -e 'renv::restore()'
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgdal-dev \
+            libproj-dev \
+            libgeos-dev \
+            libudunits2-dev \
+            libcurl4-openssl-dev \
+            libxml2-dev
 
-      - name: Print repo structure (debug)
-        run: |
-          echo "Repo structure:"
-          find . -type f
+      - name: Install renv
+        run: Rscript -e 'install.packages("renv", repos = "https://cloud.r-project.org")'
 
-      - name: Run daily forecast update
+      - name: Restore R environment
+        run: Rscript -e 'renv::restore()'
+
+      - name: Run daily forecast script
+        run: Rscript scripts/daily_forecast.R
+
+      - name: Configure Git
         run: |
-          Rscript -e '
-            source("R/acquire_forecast.R")
-            input_date <- as.character(Sys.Date() - 1)
-            current_drivers <- readr::read_csv("data/drivers/observed_soil_drivers.csv")
-            input_drivers <- acquire_forecast(input_date, forecast_vals = "gec00", forecast_horizon = "f000") |>
-              dplyr::mutate(date = input_date) |> 
-              tidyr::pivot_wider() |> 
-              dplyr::relocate(date, field_site_id) |> 
-              dplyr::rename(site = field_site_id)
-            out_drivers <- dplyr::bind_rows(current_drivers, input_drivers)
-            readr::write_csv(out_drivers, "data/drivers/observed_soil_drivers.csv")
-          '
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+
 
       - name: Commit forecast update to branch
         run: |
