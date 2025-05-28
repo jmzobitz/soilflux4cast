@@ -2,67 +2,69 @@ name: Daily Forecast Update
 
 on:
   schedule:
-    - cron: '0 6 * * *'  # Run at 6 AM UTC every day
-  workflow_dispatch:     # Allow manual trigger
+    - cron: "0 6 * * *"  # Runs at 6:00 AM UTC daily
+  workflow_dispatch:
 
 jobs:
   update-forecast:
     runs-on: ubuntu-latest
 
+    env:
+      TZ: UTC
+      RENV_CONFIG_SANDBOX_ENABLED: "FALSE"
+      RENV_CONFIG_REPOS_OVERRIDE: "https://cloud.r-project.org"
+
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v3
 
       - name: Set up R
         uses: r-lib/actions/setup-r@v2
 
-      - name: Install system dependencies for terra
+      - name: Restore R packages with renv
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libgdal-dev \
-            libproj-dev \
-            libgeos-dev \
-            libudunits2-dev \
-            libcurl4-openssl-dev \
-            libxml2-dev
+          install.packages("renv")
+          Rscript -e 'renv::restore()'
 
-      - name: Install renv
-        run: Rscript -e 'install.packages("renv", repos = "https://cloud.r-project.org")'
-
-      - name: Restore R environment
-        run: Rscript -e 'renv::restore()'
-
-      - name: Run daily forecast script
-        run: Rscript scripts/daily_forecast.R
-
-      - name: Configure Git
+      - name: Print repo structure (debug)
         run: |
-          git config --global user.name "github-actions"
-          git config --global user.email "github-actions@github.com"
+          echo "Repo structure:"
+          find . -type f
+
+      - name: Run daily forecast update
+        run: |
+          Rscript -e '
+            source("R/acquire_forecast.R")
+            input_date <- as.character(Sys.Date() - 1)
+            current_drivers <- readr::read_csv("data/drivers/observed_soil_drivers.csv")
+            input_drivers <- acquire_forecast(input_date, forecast_vals = "gec00", forecast_horizon = "f000") |>
+              dplyr::mutate(date = input_date) |> 
+              tidyr::pivot_wider() |> 
+              dplyr::relocate(date, field_site_id) |> 
+              dplyr::rename(site = field_site_id)
+            out_drivers <- dplyr::bind_rows(current_drivers, input_drivers)
+            readr::write_csv(out_drivers, "data/drivers/observed_soil_drivers.csv")
+          '
 
       - name: Commit forecast update to branch
         run: |
           BRANCH="daily-update"
+
+          git config --global user.name "jmzobitz"
+          git config --global user.email "zobitz@augsburg.edu"
+
           git checkout -B $BRANCH
           git add data/drivers/observed_soil_drivers.csv
           git commit -m "Daily forecast update: $(date -u +'%Y-%m-%d')" || echo "No changes to commit"
-          git push https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git $BRANCH
 
-      - name: Create pull request
-        id: cpr
-        uses: peter-evans/create-pull-request@v5
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "Daily forecast update: $(date -u +'%Y-%m-%d')"
-          branch: daily-update
-          title: "Daily forecast update: $(date -u +'%Y-%m-%d')"
-          body: "This pull request includes the forecast data for the previous day."
-          base: main
+          git remote set-url origin https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git
+          git remote -v
 
-      - name: Enable auto-merge
-        uses: peter-evans/enable-pull-request-automerge@v2
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          pull-request-number: ${{ steps.cpr.outputs.pull-request-number }}
-          merge-method: squash
+          git push origin $BRANCH
+
+      - name: Create and merge pull request
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+        run: |
+          gh pr create --base main --head daily-update --title "Auto PR: Forecast update $(date -u +'%Y-%m-%d')" --body "Automated forecast update."
+          gh pr merge --auto --squash
