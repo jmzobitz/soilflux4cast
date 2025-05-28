@@ -1,18 +1,21 @@
-name: Daily Forecast Acquisition
+name: Daily Forecast Update
 
 on:
   schedule:
-    - cron: '0 6 * * *'  # Runs every day at 6 AM UTC
-  workflow_dispatch:      # Allows manual trigger if needed
+    - cron: '0 6 * * *'  # Run at 6 AM UTC every day
+  workflow_dispatch:     # Allow manual trigger
 
 jobs:
-  acquire-forecast:
+  update-forecast:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
-        
+        uses: actions/checkout@v3
+
+      - name: Set up R
+        uses: r-lib/actions/setup-r@v2
+
       - name: Install system dependencies for terra
         run: |
           sudo apt-get update
@@ -23,41 +26,43 @@ jobs:
             libudunits2-dev \
             libcurl4-openssl-dev \
             libxml2-dev
-          
-      - name: Set up R
-        uses: r-lib/actions/setup-r@v2
-        with:
-          r-version: '4.4.0'
 
       - name: Install renv
-        run: |
-          Rscript -e 'install.packages("renv", repos = "https://cloud.r-project.org")'
+        run: Rscript -e 'install.packages("renv", repos = "https://cloud.r-project.org")'
 
-
-      - name: Restore R Packages
+      - name: Restore R environment
         run: Rscript -e 'renv::restore()'
 
-      - name: Run forecast update script
-        run: |
-          Rscript -e '
-            source("R/acquire_forecast.R")
-            input_date <- as.character(Sys.Date() - 1)
-            current_drivers <- readr::read_csv("data/drivers/observed_soil_drivers.csv")
-            input_drivers <- acquire_forecast(input_date, forecast_vals = "gec00", forecast_horizon = "f000") |>
-              dplyr::mutate(date = input_date) |>
-              tidyr::pivot_wider() |>
-              dplyr::relocate(date, field_site_id) |>
-              dplyr::rename(site = field_site_id)
-            out_drivers <- rbind(current_drivers, input_drivers)
-            readr::write_csv(out_drivers, file = "data/drivers/observed_soil_drivers.csv")
-          '
+      - name: Run daily forecast script
+        run: Rscript scripts/daily_forecast.R
 
-      - name: Commit and push changes
+      - name: Configure Git
         run: |
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+
+      - name: Commit forecast update to branch
+        run: |
+          BRANCH="daily-update"
+          git checkout -B $BRANCH
           git add data/drivers/observed_soil_drivers.csv
-          git commit -m "Daily forecast update: $(date -u +"%Y-%m-%d")" || echo "No changes to commit"
-          git push
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          git commit -m "Daily forecast update: $(date -u +'%Y-%m-%d')" || echo "No changes to commit"
+          git push origin $BRANCH
+
+      - name: Create pull request
+        id: cpr
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "Daily forecast update: $(date -u +'%Y-%m-%d')"
+          branch: daily-update
+          title: "Daily forecast update: $(date -u +'%Y-%m-%d')"
+          body: "This pull request includes the forecast data for the previous day."
+          base: main
+
+      - name: Enable auto-merge
+        uses: peter-evans/enable-pull-request-automerge@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          pull-request-number: ${{ steps.cpr.outputs.pull-request-number }}
+          merge-method: squash
