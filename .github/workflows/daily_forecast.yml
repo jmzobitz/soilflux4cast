@@ -6,7 +6,7 @@ permissions:
 
 on:
   schedule:
-    - cron: '0 6 * * *'  # Run at 6 AM UTC every day
+    - cron: '0 3 * * *'  # Run at 3 AM UTC every day
   workflow_dispatch:     # Allow manual trigger
 
 jobs:
@@ -39,6 +39,9 @@ jobs:
 
       - name: Run daily forecast script
         run: Rscript scripts/daily_forecast.R
+
+      - name: Run daily forecast script
+        run: Rscript scripts/daily_predictions.R
 
       - name: Configure Git with your user info
         run: |
