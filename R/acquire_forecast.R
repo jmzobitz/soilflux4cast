@@ -12,7 +12,7 @@
 #' acquire_forecast("2024-01-01")
 acquire_forecast <- function(date,
                              forecast_vals = c("gec00",sprintf("gep%02d", 1:30)),
-                             forecast_horizon = c("f000", sprintf("f%03d", seq(24, 720, by = 24)))
+                             forecast_horizon = c("f000", sprintf("f%03d", seq(24, 384, by = 24)))
                              ) {
   
   
