@@ -38,9 +38,6 @@ jobs:
         run: Rscript -e 'renv::restore()'
 
       - name: Run daily forecast script
-        run: Rscript scripts/daily_forecast.R
-
-      - name: Run daily forecast script
         run: Rscript scripts/daily_predictions.R
 
       - name: Configure Git with your user info
