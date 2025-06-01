@@ -24,11 +24,7 @@ if (file.exists(observed_file)) {
 
 # Acquire forecast data for the previous day across all horizons
 input_drivers <- acquire_forecast(input_date) |>
-  mutate(date = input_date)
-
-print(glimpse(input_drivers))
-
-input_drivers <- input_drivers |>
+  mutate(date = input_date) |>
   pivot_wider() |>
   relocate(date, field_site_id) |>
   rename(site = field_site_id)
@@ -39,11 +35,7 @@ write_csv(input_drivers, file = driver_file)
 # Filter on the new observed data only
 new_observed <- input_drivers |>
   filter(horizon == "f000",
-         forecast == "gec00") |>
-  mutate(date = input_date) |>
-  pivot_wider() |>
-  relocate(date, field_site_id) |>
-  rename(site = field_site_id)
+         forecast == "gec00")
 
 
 # Append new data to existing data
