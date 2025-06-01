@@ -6,7 +6,7 @@ permissions:
 
 on:
   schedule:
-    - cron: '0 3 * * *'  # Run at 3 AM UTC every day
+    - cron: '0 6 * * *'  # Run at 6 AM UTC every day
   workflow_dispatch:     # Allow manual trigger
 
 jobs:
@@ -45,6 +45,11 @@ jobs:
           git config --global user.name "jmzobitz"
           git config --global user.email "zobitz@augsburg.edu"
 
+      - name: Set forecast filename
+        run: |
+          FILE="data/drivers/forecast/forecasts_soil_drivers-$(date -d "yesterday" +%F).csv"
+          echo "FILE=$FILE" >> "$GITHUB_ENV"
+
       - name: Commit forecast update to branch
         run: |
           BRANCH="daily-update"
@@ -53,8 +58,13 @@ jobs:
           git push origin --delete $BRANCH || echo "No existing remote branch to delete"
 
           git checkout -B $BRANCH
-          git add data/drivers/observed_soil_drivers.csv
+          git add data/drivers/observed/observed_soil_drivers.csv
+          git add $FILE
           git commit -m "Daily forecast update: $(date -u +'%Y-%m-%d')" || echo "No changes to commit"
+
+
+- name: Add the forecast file
+  run: git add $FILE
 
           git remote set-url origin https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git
           git push origin $BRANCH --force
