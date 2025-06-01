@@ -11,8 +11,8 @@ source("R/acquire_forecast.R")
 input_date <- as.character(Sys.Date() - 1)
 
 # File path to the driver data
-driver_file <- paste0("data/drivers/forecast_soil_drivers-",input_date,".csv")
-observed_file <- "data/drivers/observed_soil_drivers.csv"
+driver_file <- paste0("data/drivers/forecast/forecast_soil_drivers-",input_date,".csv")
+observed_file <- "data/drivers/observed/observed_soil_drivers.csv"
 
 # Read the existing data (create a new data frame if file doesn't exist)
 if (file.exists(observed_file)) {
