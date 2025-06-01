@@ -24,7 +24,11 @@ if (file.exists(observed_file)) {
 
 # Acquire forecast data for the previous day across all horizons
 input_drivers <- acquire_forecast(input_date) |>
-  mutate(date = input_date) |>
+  mutate(date = input_date)
+
+print(glimpse(input_drivers))
+
+input_drivers <- input_drivers |>
   pivot_wider() |>
   relocate(date, field_site_id) |>
   rename(site = field_site_id)
