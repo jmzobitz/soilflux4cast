@@ -47,7 +47,7 @@ jobs:
 
       - name: Set forecast filename
         run: |
-          FILE="data/drivers/forecast/forecasts_soil_drivers-$(date -d "yesterday" +%F).csv"
+          FILE="data/drivers/forecast/forecast_soil_drivers-$(date -d "yesterday" +%F).csv"
           echo "FILE=$FILE" >> "$GITHUB_ENV"
 
       - name: Commit forecast update to branch
