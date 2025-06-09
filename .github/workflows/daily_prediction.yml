@@ -1,0 +1,82 @@
+name: Daily Prediction Update
+
+permissions:
+  contents: write
+  pull-requests: write
+
+on:
+  schedule:
+    - cron: '0 18 * * *'  # Run at 18 AM UTC every day
+  workflow_dispatch:     # Allow manual trigger
+
+jobs:
+  update-forecast:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Set up R
+        uses: r-lib/actions/setup-r@v2
+
+      - name: Install system dependencies for terra
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgdal-dev \
+            libproj-dev \
+            libgeos-dev \
+            libudunits2-dev \
+            libcurl4-openssl-dev \
+            libxml2-dev
+
+      - name: Install renv
+        run: Rscript -e 'install.packages("renv", repos = "https://cloud.r-project.org")'
+
+      - name: Restore R environment
+        run: Rscript -e 'renv::restore()'
+
+      - name: Set forecast filename
+        run: echo "FILE=data/drivers/forecast/forecast_soil_drivers-$(date -d 'yesterday' +%F).csv" >> $GITHUB_ENV
+
+      - name: Set forecast date and output file
+        run: |
+          FORECAST_DATE=$(date -d "yesterday" +%F)
+          echo "FORECAST_DATE=$FORECAST_DATE" >> $GITHUB_ENV
+          echo "OUTPUT_FILE=data/drivers/forecast/forecast-outputs/forecast_prediction-$FORECAST_DATE.csv" >> $GITHUB_ENV
+
+      - name: Run daily forecast script
+        run: Rscript scripts/daily_prediction.R "$FILE"
+
+      - name: Configure Git with your user info
+        run: |
+          git config --global user.name "jmzobitz"
+          git config --global user.email "zobitz@augsburg.edu"
+
+      - name: Commit forecast update to branch
+        run: |
+          BRANCH="daily-forecast-update"
+
+          # Optional: Delete existing remote branch to avoid conflicts
+          git push origin --delete $BRANCH || echo "No existing remote branch to delete"
+
+          git checkout -B $BRANCH
+          git add "$OUTPUT_FILE"
+          git commit -m "Add forecast output for $FORECAST_DATE" || echo "No changes to commit"
+          
+          git remote set-url origin https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git
+          git push origin $BRANCH --force
+
+      - name: Check GitHub CLI version
+        run: gh --version
+
+      - name: Create and merge pull request
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+        run: |
+          gh pr create --base main --head daily-update \
+            --title "Auto PR: Forecast update $(date -u +'%Y-%m-%d')" \
+            --body "Automated forecast update."
+
+          gh pr merge --squash --admin

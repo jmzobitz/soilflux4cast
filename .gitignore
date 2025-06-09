@@ -4,7 +4,6 @@
 /data/flux-05-06/
 /data/flux-results-day-0824/
 /data/forecast-env-data/
-/data/forecast-outputs/
 
 # History files
 .Rhistory
