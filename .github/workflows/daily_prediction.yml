@@ -30,7 +30,7 @@ jobs:
         run: |
           FORECAST_DATE=$(date -d "yesterday" +%F)
           echo "FORECAST_DATE=$FORECAST_DATE" >> $GITHUB_ENV
-          echo "OUTPUT_FILE=data/drivers/forecast/forecast-outputs/forecast_prediction-$FORECAST_DATE.csv" >> $GITHUB_ENV
+          echo "OUTPUT_FILE=data/outputs/forecast_prediction-$FORECAST_DATE.csv" >> $GITHUB_ENV
 
       - name: Run daily forecast script
         run: Rscript scripts/daily_prediction.R "$FILE"
