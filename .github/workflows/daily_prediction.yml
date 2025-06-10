@@ -43,26 +43,30 @@ jobs:
       - name: Commit forecast update to branch
         run: |
           BRANCH="daily-forecast-update"
-
-          # Optional: Delete existing remote branch to avoid conflicts
-          git push origin --delete $BRANCH || echo "No existing remote branch to delete"
-
           git checkout -B $BRANCH
-          git add "$OUTPUT_FILE"
+          git add "$OUTPUT_FILE" || echo "No file to add"
           git commit -m "Add forecast output for $FORECAST_DATE" || echo "No changes to commit"
-          
           git remote set-url origin https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git
-          git push origin $BRANCH --force
-
-      - name: Check GitHub CLI version
-        run: gh --version
+          git push origin $BRANCH --force || echo "Push failed or nothing to push"
 
       - name: Create and merge pull request
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
-          gh pr create --base main --head daily-update \
-            --title "Auto PR: Forecast update $(date -u +'%Y-%m-%d')" \
-            --body "Automated forecast update."
+          BRANCH="daily-forecast-update"
+          if gh pr view $BRANCH > /dev/null 2>&1; then
+            echo "PR already exists, attempting to merge..."
+          else
+            gh pr create \
+              --base main \
+              --head $BRANCH \
+              --title "Auto PR: Forecast update $FORECAST_DATE" \
+              --body "Automated forecast update." || echo "PR creation failed"
+          fi
 
-          gh pr merge --squash --admin
+          # Try merging the PR only if it now exists
+          if gh pr view $BRANCH > /dev/null 2>&1; then
+            gh pr merge --squash --admin $BRANCH || echo "Merge failed"
+          else
+            echo "No PR to merge"
+          fi
