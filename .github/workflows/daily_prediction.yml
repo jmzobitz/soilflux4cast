@@ -24,7 +24,7 @@ jobs:
         run: Rscript -e 'install.packages(c("readr","dplyr","tidyr","stringr"), repos = "https://cloud.r-project.org")'
 
       - name: Set forecast filename
-        run: echo "FILE=data/outputs/forecast_soil_drivers-$(date -d 'yesterday' +%F).csv" >> $GITHUB_ENV
+        run: echo "FILE=data/drivers/forecast/forecast_soil_drivers-$(date -d 'yesterday' +%F).csv" >> $GITHUB_ENV
 
       - name: Set forecast date and output file
         run: |
