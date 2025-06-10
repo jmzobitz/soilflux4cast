@@ -27,7 +27,7 @@ input_forecast <- readr::read_csv(input_file) |>
 forecast_date <- input_file |> 
   stringr::str_extract(pattern = "[:digit:]{4}-[:digit:]{2}-[:digit:]{2}(?=.csv)")
 
-forecast_file <- paste0('data/outputs/forecast_prediction-',forecast_date)
+forecast_file <- paste0('data/outputs/forecast_prediction-',forecast_date,'.csv')
 
 
 # Write updated data back to CSV
