@@ -1,9 +1,7 @@
 # Load required packages
 library(readr)
-library(purrr)
 library(dplyr)
 library(tidyr)
-library(lubridate)
 library(stringr)
 
 args <- commandArgs(trailingOnly = TRUE)
@@ -26,7 +24,8 @@ input_forecast <- readr::read_csv(input_file) |>
 
 
 # Determine the date of forecast
-forecast_date <- input_file |> str_extract(pattern = "[:digit:]{4}-[:digit:]{2}-[:digit:]{2}(?=.csv)")
+forecast_date <- input_file |> 
+  stringr::str_extract(pattern = "[:digit:]{4}-[:digit:]{2}-[:digit:]{2}(?=.csv)")
 
 forecast_file <- paste0('data/outputs/forecast_prediction-',forecast_date)
 
