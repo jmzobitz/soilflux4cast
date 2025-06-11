@@ -6,7 +6,7 @@ permissions:
 
 on:
   schedule:
-    - cron: '0 1 * * *'  # Run at (8 PM CDT the day before
+    - cron: '0 10 * * *'  # Run at 10 UTC
   workflow_dispatch:     # Allow manual trigger
 
 jobs:
