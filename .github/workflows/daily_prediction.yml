@@ -6,7 +6,7 @@ permissions:
 
 on:
   schedule:
-    - cron: '0 18 * * *'  # Run at 18 AM UTC every day
+    - cron: '0 1 * * *'  # Run at (8 PM CDT the day before
   workflow_dispatch:     # Allow manual trigger
 
 jobs:
@@ -17,15 +17,25 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
 
+      - name: Set forecast filename
+        run: echo "FILE=data/drivers/forecast/forecast_soil_drivers-$(date -d 'yesterday' +%F).csv" >> $GITHUB_ENV
+
+      - name: Check if forecast file exists
+        run: |
+          if [ ! -f "$FILE" ]; then
+            echo "Forecast file $FILE not found. Exiting."
+            exit 0
+          fi
+
+
       - name: Set up R
         uses: r-lib/actions/setup-r@v2
 
       - name: Install renv
         run: Rscript -e 'install.packages(c("readr","dplyr","tidyr","stringr"), repos = "https://cloud.r-project.org")'
 
-      - name: Set forecast filename
-        run: echo "FILE=data/drivers/forecast/forecast_soil_drivers-$(date -d 'yesterday' +%F).csv" >> $GITHUB_ENV
 
+          
       - name: Set forecast date and output file
         run: |
           FORECAST_DATE=$(date -d "yesterday" +%F)
