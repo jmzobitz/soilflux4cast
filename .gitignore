@@ -1,9 +1,6 @@
 # do not commit data files
-/data/daily-flux/
-/data/env-05-06/
-/data/flux-05-06/
-/data/flux-results-day-0824/
-/data/forecast-env-data/
+/data/validation/
+/dead_code/
 
 # History files
 .Rhistory

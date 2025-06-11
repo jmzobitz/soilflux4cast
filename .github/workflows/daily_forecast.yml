@@ -5,9 +5,9 @@ permissions:
   pull-requests: write
 
 on:
-  schedule:
-    - cron: '0 6 * * *'  # Run at 6 AM UTC every day
-  workflow_dispatch:     # Allow manual trigger
+  #schedule:
+  #  - cron: '0 6 * * *'  # Run at 6 AM UTC every day
+  #workflow_dispatch:     # Allow manual trigger
 
 jobs:
   update-forecast:
