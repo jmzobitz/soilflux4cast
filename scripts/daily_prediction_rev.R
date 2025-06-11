@@ -19,7 +19,15 @@ site_data <- readr::read_csv(paste0("https://raw.githubusercontent.com/eco4cast/
 # Define null model to create soil values
 null_model <- function(TSOIL) {
   
-  R_S <- (0.598 + exp(0.044*(TSOIL-273.15)))
+  # Globbed from bigleaf R package scripts
+  # molar mass of carbon (kg mol-1) = 0.012011
+  # conversion micromole (umol) to mole (mol) = 1e-06
+  # conversion kilogram (kg) to gram (g) = 1000
+  # seconds per day = 86400
+  
+  conv <- 1e-6 * 0.012011 * 1000 * 86400
+  
+  R_S <- (0.598 + exp(0.044*(TSOIL-273.15)))*conv  # Convert to gC m-2 d-1
   
   return(R_S)
 }
