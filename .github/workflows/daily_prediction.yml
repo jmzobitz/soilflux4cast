@@ -54,19 +54,21 @@ jobs:
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
           BRANCH="daily-forecast-update"
-          if gh pr view $BRANCH > /dev/null 2>&1; then
-            echo "PR already exists, attempting to merge..."
+
+    # Only create PR if it doesn't already exist
+          if gh pr view $BRANCH --json number > /dev/null 2>&1; then
+            echo "PR already exists for $BRANCH"
           else
             gh pr create \
               --base main \
               --head $BRANCH \
               --title "Auto PR: Forecast update $FORECAST_DATE" \
-              --body "Automated forecast update." || echo "PR creation failed"
+              --body "Automated forecast update."
           fi
 
-          # Try merging the PR only if it now exists
-          if gh pr view $BRANCH > /dev/null 2>&1; then
-            gh pr merge --squash --admin $BRANCH || echo "Merge failed"
+    # Merge and auto-delete branch if PR exists
+          if gh pr view $BRANCH --json number > /dev/null 2>&1; then
+            gh pr merge --squash --admin --delete-branch $BRANCH || echo "Merge failed"
           else
             echo "No PR to merge"
           fi
