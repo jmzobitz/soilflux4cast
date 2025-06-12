@@ -48,7 +48,7 @@ jobs:
       - name: Set forecast date and output file
         run: |
           #NEON_DATE=$(date -d 'last month' +%Y-%m)
-          NEON_DATE=$(date -d '2 months ago' +%Y-%m)
+          NEON_DATE=$(date -d '3 months ago' +%Y-%m)
           echo "NEON_DATE=$NEON_DATE" >> $GITHUB_ENV
 
       - name: Run daily forecast script
