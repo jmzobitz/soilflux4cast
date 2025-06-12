@@ -63,11 +63,11 @@ jobs:
         run: echo "BRANCH=new-neon-month-${{ env.NEON_DATE }}" >> $GITHUB_ENV
 
 
-      - name: Commit forecast update to branch
+      - name: Commit NEON monthly update to branch
         run: |
           git checkout -B $BRANCH
-          git add data/outputs/neon/forecast_prediction-*-"$NEON_DATE".csv || echo "No files to add"
-          git add data/drivers/observed/neon/soil_drivers-*-"$NEON_DATE".csv || echo "No files to add"
+          git add data/targets/neon_targets-"$NEON_DATE".csv || echo "No files to add"
+          git add data/drivers/neon_soil_drivers-"$NEON_DATE".csv || echo "No files to add"
           git commit -m "Add forecast output for $NEON_DATE" || echo "No changes to commit"
           git remote set-url origin https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git
           git push origin $BRANCH --force || echo "Push failed or nothing to push"

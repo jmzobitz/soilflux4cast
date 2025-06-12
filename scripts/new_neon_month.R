@@ -100,7 +100,7 @@ for (i in 1:3) {
       try(
         # NOTE: you will need to say y/n at several points here
         {
-          out_driver_name <- paste0("data/drivers/observed/neon/soil_drivers-", curr_site_name, "-", curr_month, ".csv")
+          out_driver_name <- paste0("data/drivers/neon/soil_drivers-", curr_site_name, "-", curr_month, ".csv")
           write_csv(env_joined, file = out_driver_name)
         }
       )
@@ -127,7 +127,7 @@ for (i in 1:3) {
 
 
 
-          out_flux_name <- paste0("data/outputs/neon/forecast_prediction-", curr_site_name, "-", curr_month, ".csv")
+          out_flux_name <- paste0("data/targets/neon/forecast_prediction-", curr_site_name, "-", curr_month, ".csv")
 
           write_csv(flux_full, file = out_flux_name)
         }
@@ -135,3 +135,55 @@ for (i in 1:3) {
     }
   )
 }
+
+# Now glob together all the env values for a given month and delete the intermediate files:
+
+env_files <- list.files(path = "data/drivers/neon",
+                        full.names = TRUE
+                        ) |>
+  str_subset(pattern = paste0("(?<=[:alpha:]{4}-)", curr_month, ".csv"))
+
+
+if(length(env_files)>0) {
+  out_env <- tibble(
+    site_id = str_extract(env_files,pattern = "(?<=soil_drivers-)[:alpha:]{4}"),
+    values = lapply(env_files, readr::read_csv)
+  ) |>
+    unnest(cols=c(values))
+  
+   env_save_file <- paste0("data/drivers/neon_soil_drivers-", curr_month, ".csv")
+   
+   # Save globbed file
+   write_csv(out_env, file = env_save_file)
+   
+   # Remove the separate files
+   file.remove(env_files)
+   
+}
+
+# Do the same for the targets (soil flux)
+flux_files <- list.files(path = "data/targets/neon", 
+                         full.names = TRUE
+                         ) |>
+  str_subset(pattern = paste0("(?<=[:alpha:]{4}-)", curr_month, ".csv"))
+
+
+
+if(length(flux_files)>0) {
+  out_flux <- tibble(
+    site_id = str_extract(flux_files,pattern = "(?<=forecast_prediction-)[:alpha:]{4}"),
+    values = lapply(flux_files, readr::read_csv)
+  ) |>
+    unnest(cols=c(values))
+  
+  flux_save_file <- paste0("data/targets/neon_targets-", curr_month, ".csv")
+  
+  # Save globbed file
+  write_csv(out_flux, file = flux_save_file)
+  
+  # Remove the separate files
+  file.remove(flux_files)
+  
+}
+
+
