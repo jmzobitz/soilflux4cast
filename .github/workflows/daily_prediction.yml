@@ -70,7 +70,7 @@ jobs:
 
           # Merge and auto-delete branch if PR exists
           if gh pr view $BRANCH --json number > /dev/null 2>&1; then
-            gh pr merge --squash --admin || echo "Merge failed"
+            gh pr merge --squash --admin --delete-branch || echo "Merge failed"
           else
             echo "No PR to merge"
           fi
