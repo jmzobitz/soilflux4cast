@@ -41,9 +41,12 @@ jobs:
           git config --global user.name "jmzobitz"
           git config --global user.email "zobitz@augsburg.edu"
 
+      - name: Set branch name
+        run: echo "BRANCH=daily-forecast-update-${{ env.FORECAST_DATE }}" >> $GITHUB_ENV
+
+
       - name: Commit forecast update to branch
         run: |
-          BRANCH="daily-forecast-update"
           git checkout -B $BRANCH
           git add "$OUTPUT_FILE" || echo "No file to add"
           git commit -m "Add forecast output for $FORECAST_DATE" || echo "No changes to commit"
@@ -54,8 +57,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
-          BRANCH="daily-forecast-update"
-
           # Only create PR if it doesn't already exist
           if gh pr view $BRANCH --json number > /dev/null 2>&1; then
             echo "PR already exists for $BRANCH"
