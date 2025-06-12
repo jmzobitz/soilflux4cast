@@ -53,8 +53,7 @@ compute_mean <- function(input_data) {
 }
 
 
-# for(i in 1:nrow(site_names)) {
-for (i in 1:3) {
+for(i in 1:nrow(site_names)) {
   # Process
   try(
     # NOTE: you will need to say y/n at several points here
