@@ -52,7 +52,7 @@ jobs:
           echo "NEON_DATE=$NEON_DATE" >> $GITHUB_ENV
 
       - name: Run daily forecast script
-        run: Rscript scripts/daily_prediction.R "$NEON_DATE"
+        run: Rscript scripts/new_neon_month.R "$NEON_DATE"
 
       - name: Configure Git with your user info
         run: |
