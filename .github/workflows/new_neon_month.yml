@@ -40,8 +40,10 @@ jobs:
         run: Rscript -e 'install.packages(c("neonUtilities","tidyverse","devtools"), repos = "https://cloud.r-project.org")'
         
       - name: Install neonSoilFlux from GitHub
+        env:
+          GITHUB_PAT: ${{ secrets.PAT_TOKEN }}
         run: |
-          Rscript -e 'devtools::install_github("jmzobitz/neonSoilFlux", build = TRUE, build_opts = c("--no-resave-data", "--no-manual"), force = TRUE)'
+          Rscript -e 'devtools::install_github("jmzobitz/neonSoilFlux", auth_token = Sys.getenv("GITHUB_PAT"), build = TRUE, build_opts = c("--no-resave-data", "--no-manual"), force = TRUE)'
 
       - name: Set forecast date and output file
         run: |
