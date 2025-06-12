@@ -59,9 +59,12 @@ jobs:
           git config --global user.name "jmzobitz"
           git config --global user.email "zobitz@augsburg.edu"
 
+      - name: Set branch name
+        run: echo "BRANCH=new-neon-month-${{ env.NEON_DATE }}" >> $GITHUB_ENV
+
+
       - name: Commit forecast update to branch
         run: |
-          BRANCH="new-neon-month"
           git checkout -B $BRANCH
           git add data/outputs/neon/forecast_prediction-*-"$NEON_DATE".csv || echo "No files to add"
           git add data/drivers/observed/neon/soil_drivers-*-"$NEON_DATE".csv || echo "No files to add"
@@ -73,8 +76,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
-          BRANCH="daily-forecast-update"
-
           # Only create PR if it doesn't already exist
           if gh pr view $BRANCH --json number > /dev/null 2>&1; then
             echo "PR already exists for $BRANCH"
