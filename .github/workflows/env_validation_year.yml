@@ -35,7 +35,7 @@ jobs:
             pkg-config
             
       - name: Install CRAN packages
-        run: Rscript -e 'install.packages(c("neonUtilities","tidyverse","devtools"), repos = "https://cloud.r-project.org")'
+        run: Rscript -e 'install.packages(c("neonUtilities","tidyverse","devtools","glue","arrow"), repos = "https://cloud.r-project.org")'
         
       - name: Run R script for each month
         run: |
