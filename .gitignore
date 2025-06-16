@@ -1,5 +1,4 @@
 # do not commit data files
-/data/validation/
 /dead_code/
 
 # History files

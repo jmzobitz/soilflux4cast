@@ -1,0 +1,89 @@
+name: Validate NEON fluxes for a timespan (year)
+permissions:
+  contents: write
+  pull-requests: write
+
+on:
+  workflow_dispatch:     # Allow manual trigger
+
+jobs:
+  update-forecast:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Set up R
+        uses: r-lib/actions/setup-r@v2
+
+      - name: Install system dependencies for R packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libcurl4-openssl-dev \
+            libssl-dev \
+            libxml2-dev \
+            libharfbuzz-dev \
+            libfribidi-dev \
+            libfreetype6-dev \
+            libpng-dev \
+            libtiff5-dev \
+            libjpeg-dev \
+            libgit2-dev \
+            libfontconfig1-dev \
+            pkg-config
+            
+      - name: Install CRAN packages
+        run: Rscript -e 'install.packages(c("neonUtilities","tidyverse","devtools"), repos = "https://cloud.r-project.org")'
+        
+      - name: Run R script for each month
+        run: |
+          Rscript -e '
+            library(lubridate)
+            months <- seq(ymd("2024-01-01"), ymd("2024-12-01"), by = "1 month")
+            months_str <- format(months, "%Y-%m")
+            for (curr_month in months_str) {
+              message("Running for month: ", curr_month)
+              source("scripts/compute_taylor_data.R")  # assumes script uses `m` in environment
+            }
+          '
+
+      - name: Configure Git with your user info
+        run: |
+          git config --global user.name "jmzobitz"
+          git config --global user.email "zobitz@augsburg.edu"
+
+      - name: Set branch name
+        run: echo "BRANCH=new-env-validation" >> $GITHUB_ENV
+
+      - name: Commit NEON monthly update to branch
+        run: |
+          git checkout -B $BRANCH
+          git add data/validation/noaa-gefs-validate-*.csv
+          git commit -m "Add/update validation CSVs for all months" || echo "No changes to commit"
+          git push
+          git remote set-url origin https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git
+          git push origin $BRANCH --force || echo "Push failed or nothing to push"
+
+      - name: Create and merge pull request
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+        run: |
+          # Only create PR if it doesn't already exist
+          if gh pr view $BRANCH --json number > /dev/null 2>&1; then
+            echo "PR already exists for $BRANCH"
+          else
+            gh pr create \
+              --base main \
+              --head $BRANCH \
+              --title "Auto PR: driver data validation" \
+              --body "Automated forecast update."
+          fi
+
+          # Merge and auto-delete branch if PR exists
+          if gh pr view $BRANCH --json number > /dev/null 2>&1; then
+            gh pr merge --squash --admin --delete-branch || echo "Merge failed"
+          else
+            echo "No PR to merge"
+          fi
