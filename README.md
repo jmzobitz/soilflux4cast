@@ -11,6 +11,9 @@ This repository contains information to run a soil flux forecast at terrestrial 
   - `targets_available` lets you know for which month there are soil flux targets (both for evaluation and hindcasting)
   
 
+## Technical notes
+[Technical notes](documentation/00-technical-notes.md)
+
 THE FOLLOWING BELOW IS TEXT TO BE EDITED FROM THE NEON4CAST EXAMPLE TEMPLATE
 
 ## Applying this repository to a new forecast
