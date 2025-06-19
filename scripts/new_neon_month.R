@@ -25,33 +25,13 @@ site_names <- readr::read_csv(paste0("https://raw.githubusercontent.com/eco4cast
   dplyr::select(field_site_id, field_latitude, field_longitude) |>
   dplyr::rename(site_id = field_site_id)
 
+# Globbed from bigleaf R package scripts
+# molar mass of carbon (kg mol-1) = 0.012011
+# conversion micromole (umol) to mole (mol) = 1e-06
+# conversion kilogram (kg) to gram (g) = 1000
+# seconds per half hour = 1800
 
-# Define a helper function to compute the mean:
-compute_mean <- function(input_data) {
-  n_good <- sum(!is.na(input_data$flux))
-  n_tot <- nrow(input_data)
-  out_tibble <- tibble(
-    flux = NA,
-    flux_err = NA,
-    n = 0
-  )
-
-  if (n_good > 0) {
-    out_tibble <- input_data |>
-      filter(!is.na(flux_err)) |>
-      summarize(
-        flux = mean(flux, na.rm = TRUE),
-        flux_err = neonSoilFlux::quadrature_error(1 / n(), flux_err),
-        n = n(),
-        .groups = "drop"
-      )
-  }
-
-
-
-  return(out_tibble)
-}
-
+conv <- 1e-6 * 0.012011 * 1000 * 1800
 
 for(i in 1:nrow(site_names)) {
   # Process
@@ -114,15 +94,22 @@ for(i in 1:nrow(site_names)) {
           ) |>
             select(-surface_diffusivity) |>
             unnest(cols = c(flux_compute)) |>
-            filter(
-              hour(startDateTime) == 0,
-              minute(startDateTime) == 0
-            ) |>
             group_by(startDateTime) |>
-            nest() |>
-            mutate(fluxes = map(data, compute_mean)) |>
-            select(-data) |>
-            unnest(cols = c(fluxes))
+            mutate(flux =flux*conv,
+                   flux_err = flux_err*conv,
+            ) |>
+            summarize(flux_out = mean(flux,na.rm=TRUE),
+                      flux_err = sd(flux,na.rm=TRUE)/sqrt(sum(!is.na(flux)))
+                      
+            ) |>
+            rename(flux = flux_out) |>
+            group_by(startDateTime = floor_date(startDateTime,unit="day")) |>
+            summarize(flux = sum(flux,na.rm=TRUE),
+                      flux_err = sqrt(sum(flux_err^2,na.rm=TRUE))) |>
+            ungroup() |>
+            mutate(site_id = site_name) |>
+            relocate(site_id) |>
+            arrange(startDateTime)
 
 
 
