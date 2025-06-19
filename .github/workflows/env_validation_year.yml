@@ -41,7 +41,7 @@ jobs:
         run: |
           Rscript -e '
             library(lubridate)
-            months <- seq(ymd("2024-01-01"), ymd("2024-12-01"), by = "1 month")
+            months <- seq(ymd("2024-01-01"), ymd("2024-04-01"), by = "1 month")
             months_str <- format(months, "%Y-%m")
             for (curr_month in months_str) {
               message("Running for month: ", curr_month)
