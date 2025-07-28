@@ -1,6 +1,9 @@
 # do not commit data files
 /dead_code/
 
+# Mac
+.DS_Store
+
 # History files
 .Rhistory
 .Rapp.history
@@ -40,4 +43,14 @@ vignettes/*.pdf
 
 # R Environment Variables
 .Renviron
+
+# workflow data - just so it isn't too much to draw out.
+/data/
+
+# process files
+/process/
+
+# results filels
+/results/
+
 
