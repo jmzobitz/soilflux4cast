@@ -51,7 +51,7 @@ jobs:
           #NEON_DATE=$(date -d '3 months ago' +%Y-%m)
           echo "NEON_DATE=$NEON_DATE" >> $GITHUB_ENV
 
-      - name: Run daily forecast script
+      - name: Run new NEON data for the month
         run: Rscript scripts/new_neon_month.R "$NEON_DATE"
 
       - name: Configure Git with your user info

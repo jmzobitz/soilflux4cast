@@ -107,7 +107,7 @@ for(i in 1:nrow(site_names)) {
             summarize(flux = sum(flux,na.rm=TRUE),
                       flux_err = sqrt(sum(flux_err^2,na.rm=TRUE))) |>
             ungroup() |>
-            mutate(site_id = site_name) |>
+            mutate(site_id = curr_site_name) |>
             relocate(site_id) |>
             arrange(startDateTime)
 
