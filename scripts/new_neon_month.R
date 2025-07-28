@@ -23,8 +23,7 @@ library(neonUtilities)
 site_names <- readr::read_csv(paste0("https://raw.githubusercontent.com/eco4cast/neon4cast-targets/", "main/NEON_Field_Site_Metadata_20220412.csv"), show_col_types = FALSE) |>
   dplyr::filter(terrestrial == 1) |>
   dplyr::select(field_site_id, field_latitude, field_longitude) |>
-  dplyr::rename(site_id = field_site_id) |>
-  dplyr::filter(site_id %in% c("ABBY","BART"))
+  dplyr::rename(site_id = field_site_id)
 
 # Globbed from bigleaf R package scripts
 # molar mass of carbon (kg mol-1) = 0.012011
@@ -158,10 +157,12 @@ flux_files <- list.files(path = "data/targets/neon",
 
 if(length(flux_files)>0) {
   out_flux <- tibble(
-    site_id = str_extract(flux_files,pattern = "(?<=forecast_prediction-)[:alpha:]{4}"),
+    site_name = str_extract(flux_files,pattern = "(?<=forecast_prediction-)[:alpha:]{4}"),
     values = lapply(flux_files, readr::read_csv)
   ) |>
-    unnest(cols=c(values))
+    select(-site_name) |>
+    unnest(cols=c(values)) |>
+    ungroup()
   
   flux_save_file <- paste0("data/targets/neon_targets-", curr_month, ".csv")
   
