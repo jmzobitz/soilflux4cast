@@ -13,9 +13,6 @@ jobs:
   update-forecast:
     runs-on: ubuntu-latest
 
-    env:
-      BRANCH: neon-monthly-auto
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -53,6 +50,9 @@ jobs:
           git config --global user.name "jmzobitz"
           git config --global user.email "zobitz@augsburg.edu"
 
+      - name: Set branch name
+        run: echo "BRANCH=neon-monthly-auto-${{ env.NEON_DATE }}" >> $GITHUB_ENV
+
       - name: Commit updated forecast files
         run: |
           git checkout -B $BRANCH
@@ -76,4 +76,11 @@ jobs:
               --head $BRANCH \
               --title "Auto PR: Forecast update $NEON_DATE" \
               --body "Automated forecast update."
+          fi
+
+          # Merge and auto-delete branch if PR exists
+          if gh pr view $BRANCH --json number > /dev/null 2>&1; then
+            gh pr merge --squash --admin --delete-branch || echo "Merge failed"
+          else
+            echo "No PR to merge"
           fi
