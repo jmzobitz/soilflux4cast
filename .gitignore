@@ -44,13 +44,11 @@ vignettes/*.pdf
 # R Environment Variables
 .Renviron
 
-# workflow data - just so it isn't too much to draw out.
-/data/
 
 # process files
 /process/
 
-# results filels
+# results files
 /results/
 
 
