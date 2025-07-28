@@ -23,7 +23,8 @@ library(neonUtilities)
 site_names <- readr::read_csv(paste0("https://raw.githubusercontent.com/eco4cast/neon4cast-targets/", "main/NEON_Field_Site_Metadata_20220412.csv"), show_col_types = FALSE) |>
   dplyr::filter(terrestrial == 1) |>
   dplyr::select(field_site_id, field_latitude, field_longitude) |>
-  dplyr::rename(site_id = field_site_id)
+  dplyr::rename(site_id = field_site_id) |>
+  dplyr::filter(site_id %in% c("ABBY","BART"))
 
 # Globbed from bigleaf R package scripts
 # molar mass of carbon (kg mol-1) = 0.012011
