@@ -1,95 +1,79 @@
 name: Acquire NEON data and fluxes for the previous month
+
 permissions:
   contents: write
   pull-requests: write
 
 on:
   schedule:
-    - cron: '0 10 15 * *'  # Run at 10 UTC
-  workflow_dispatch:     # Allow manual trigger
+    - cron: '0 10 15 * *'  # Runs at 10 UTC on the 15th of every month
+  workflow_dispatch:       # Allow manual triggering
 
 jobs:
   update-forecast:
     runs-on: ubuntu-latest
 
+    env:
+      BRANCH: neon-monthly-auto
+
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v3
 
       - name: Set up R
         uses: r-lib/actions/setup-r@v2
 
-      - name: Install system dependencies for R packages
+      - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            libcurl4-openssl-dev \
-            libssl-dev \
-            libxml2-dev \
-            libharfbuzz-dev \
-            libfribidi-dev \
-            libfreetype6-dev \
-            libpng-dev \
-            libtiff5-dev \
-            libjpeg-dev \
-            libgit2-dev \
-            libfontconfig1-dev \
-            pkg-config
-            
+            libcurl4-openssl-dev libssl-dev libxml2-dev \
+            libharfbuzz-dev libfribidi-dev libfreetype6-dev \
+            libpng-dev libtiff5-dev libjpeg-dev \
+            libgit2-dev libfontconfig1-dev pkg-config
+
       - name: Install CRAN packages
-        run: Rscript -e 'install.packages(c("neonUtilities","tidyverse","devtools"), repos = "https://cloud.r-project.org")'
-        
+        run: |
+          Rscript -e 'install.packages(c("neonUtilities", "tidyverse", "devtools"), repos = "https://cloud.r-project.org")'
+
       - name: Install neonSoilFlux from GitHub
         env:
           GITHUB_PAT: ${{ secrets.PAT_TOKEN }}
         run: |
-          Rscript -e 'devtools::install_github("jmzobitz/neonSoilFlux", auth_token = Sys.getenv("GITHUB_PAT"), build = TRUE, build_opts = c("--no-resave-data", "--no-manual"), force = TRUE)'
+          Rscript -e 'devtools::install_github("jmzobitz/neonSoilFlux", auth_token = Sys.getenv("GITHUB_PAT"))'
 
-      - name: Set forecast date and output file
-        run: |
-          NEON_DATE=$(date -d 'last month' +%Y-%m)
-          #NEON_DATE=$(date -d '3 months ago' +%Y-%m)
-          echo "NEON_DATE=$NEON_DATE" >> $GITHUB_ENV
+      - name: Set NEON_DATE to last month
+        run: echo "NEON_DATE=$(date -d 'last month' +%Y-%m)" >> $GITHUB_ENV
 
-      - name: Run new NEON data for the month
+      - name: Run NEON data forecast script
         run: Rscript scripts/new_neon_month.R "$NEON_DATE"
 
-      - name: Configure Git with your user info
+      - name: Configure Git
         run: |
           git config --global user.name "jmzobitz"
           git config --global user.email "zobitz@augsburg.edu"
 
-      - name: Set branch name
-        run: echo "BRANCH=new-neon-month-${{ env.NEON_DATE }}" >> $GITHUB_ENV
-
-
-      - name: Commit NEON monthly update to branch
+      - name: Commit updated forecast files
         run: |
           git checkout -B $BRANCH
-          git add data/targets/neon_targets-"$NEON_DATE".csv || echo "No files to add"
-          git add data/drivers/neon_soil_drivers-"$NEON_DATE".csv || echo "No files to add"
-          git commit -m "Add forecast output for $NEON_DATE" || echo "No changes to commit"
+          git add data/targets/neon_targets-"$NEON_DATE".csv || echo "No targets file"
+          git add data/drivers/neon_soil_drivers-"$NEON_DATE".csv || echo "No drivers file"
+          git commit -m "Update forecast output for $NEON_DATE" || echo "No changes to commit"
           git remote set-url origin https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git
-          git push origin $BRANCH --force || echo "Push failed or nothing to push"
+          git push origin $BRANCH || echo "Nothing to push"
 
-      - name: Create and merge pull request
+      - name: Create or merge pull request
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
-          # Only create PR if it doesn't already exist
           if gh pr view $BRANCH --json number > /dev/null 2>&1; then
-            echo "PR already exists for $BRANCH"
+            echo "PR already exists — attempting to merge"
+            gh pr merge --squash --admin || echo "Merge failed"
           else
+            echo "Creating new PR"
             gh pr create \
               --base main \
               --head $BRANCH \
               --title "Auto PR: Forecast update $NEON_DATE" \
               --body "Automated forecast update."
-          fi
-
-          # Merge and auto-delete branch if PR exists
-          if gh pr view $BRANCH --json number > /dev/null 2>&1; then
-            gh pr merge --squash --admin --delete-branch || echo "Merge failed"
-          else
-            echo "No PR to merge"
           fi
