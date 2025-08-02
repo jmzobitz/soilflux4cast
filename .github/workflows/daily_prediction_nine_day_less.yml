@@ -1,4 +1,4 @@
-name: Daily Prediction Update
+name: Daily Prediction Update (9 day less)
 permissions:
   contents: write
   pull-requests: write
