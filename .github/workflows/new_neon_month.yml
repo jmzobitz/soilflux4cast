@@ -51,7 +51,7 @@ jobs:
           git config --global user.email "zobitz@augsburg.edu"
 
       - name: Set branch name
-        run: echo "BRANCH=neon-monthly-auto-${{ env.NEON_DATE }}" >> $GITHUB_ENV
+        run: echo "BRANCH=neon-monthly-automatic-${{ env.NEON_DATE }}" >> $GITHUB_ENV
 
       - name: Commit updated forecast files
         run: |
