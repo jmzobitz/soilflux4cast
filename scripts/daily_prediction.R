@@ -54,13 +54,55 @@ forecast_data <- stage1 |>
 
 
 # Compute forecast
-input_forecast <- forecast_data |>
+input_forecast_null <- forecast_data |>
   mutate(model = 'null',
          value = null_model(TSOIL)) |>
   select(-all_of(env_vars))
 
 forecast_file <- paste0('data/outputs/forecast_prediction-',forecast_date,'.csv')
 
+### Now do a linear model based on last month's data
+source('R/drivers_available.R')
+source('R/targets_available.R')
+
+# Collect all the known targets and drivers
+drivers <- drivers_available()
+targets <- targets_available()
+
+# Now join the two together, by siteID and date, nesting them by site
+
+joined_vars <- targets |>
+  inner_join(drivers, by=c("site_id","startDateTime")) |> 
+  drop_na() |>
+  rename(SOILW = VSWC,
+         TSOIL = SOILT) |>
+  group_by(site_id) |>
+  nest()
+
+
+
+# Now mutate and do a linear model
+fit_vals <- joined_vars |>
+  mutate(lm_fit = map(.x=data,.f=~lm(flux~SOILW+TSOIL,data=.x)),
+         coeff = map(.x=lm_fit,.f=~(.x$coefficients)),
+         sigma = map_dbl(.x=lm_fit,.f=~(sd(.x$residuals)))
+  ) |>
+  select(site_id,lm_fit,coeff)
+
+
+
+# Compute forecast
+input_forecast_lm <- forecast_data |>
+  inner_join(fit_vals,by="site_id") |>
+  mutate(model = 'lm',
+         value = pmap_dbl(.l=list(lm_fit,TSOIL,SOILW),.f=~predict(..1,tibble(TSOIL=..2-273.15,SOILW=..3)) ) ) |>
+  select(-all_of(env_vars),-lm_fit,-coeff)
+
+####
+
+
+# glob forecasts together
+input_forecast <- rbind(input_forecast_null,input_forecast_lm)
 
 # Write updated data back to CSV
 write_csv(input_forecast, file = forecast_file)
