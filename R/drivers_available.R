@@ -12,16 +12,13 @@
 #' @import dplyr
 #' @import tidyr
 #'
-#' @returns a tible of drivers with their startDateTime, flux, and flux_err
+#' @returns a tible of drivers with their site_id, startDateTime, VSWC and SOILT
 #' @export
 #'
 #' @examples
 
-drivers_available <- function(dates) {
+drivers_available <- function(dates = NULL) {
   
-  
-  # Build regex: match dates at the end before ".csv"
-  pattern <- paste0("(", paste(dates, collapse = "|"), ")\\.csv$")
   
   # Define repo and path
   repo <- "jmzobitz/soilflux4cast"
@@ -34,13 +31,29 @@ drivers_available <- function(dates) {
   res <- httr::GET(url)
   files <- jsonlite::fromJSON(httr::content(res, "text", encoding = "UTF-8"))
   
-  # View file names
+  # Base filter: keep only soil driver csv files with YYYY-MM
+  files <- files |>
+    dplyr::filter(stringr::str_detect(name,
+                                      pattern = "(?<=neon_soil_drivers-)[:digit:]{4}-[:digit:]{2}.*\\.csv$"
+    ))
+  
+  # If dates are provided, restrict further
+  if (!is.null(dates)) {
+    pattern <- paste0("(", paste(dates, collapse = "|"), ")\\.csv$")
+    files <- files |>
+      dplyr::filter(stringr::str_detect(download_url, pattern))
+  }
+  
+  
+  # Download and read the CSVs
   download_files <- files |>
-    dplyr::filter(stringr::str_detect(name,pattern="(?<=neon_soil_drivers-)[:digit:]{4}-[:digit:]{2}" )) |>
-    dplyr::filter(stringr::str_detect(download_url, pattern)) |>
-    dplyr::mutate(data = purrr::map(.x=download_url,.f=~readr::read_csv(.x,show_col_types = FALSE))) |>
+    dplyr::mutate(data = purrr::map(
+      .x = download_url,
+      .f = ~ readr::read_csv(.x, show_col_types = FALSE)
+    )) |>
     dplyr::select(data) |>
-    tidyr::unnest(cols=c(data))
+    tidyr::unnest(cols = c(data))
+  
     
   return(download_files)
   

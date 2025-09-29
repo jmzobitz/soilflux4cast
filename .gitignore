@@ -44,8 +44,17 @@ vignettes/*.pdf
 # R Environment Variables
 .Renviron
 
-# data files
-/data/
+# Ignore everything in data/
+data/*
+
+# Allow the drivers subfolder
+!data/drivers/
+
+# Inside drivers, ignore everything...
+data/drivers/*
+
+# ...except daily driver CSVs
+!data/drivers/neon_soil_drivers-*.csv
 
 # process files
 /process/
