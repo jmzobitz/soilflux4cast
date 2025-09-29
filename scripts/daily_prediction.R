@@ -3,6 +3,7 @@ library(readr)
 library(dplyr)
 library(tidyr)
 library(stringr)
+library(purrr)
 
 args <- commandArgs(trailingOnly = TRUE)
 forecast_date <- args[1]  
