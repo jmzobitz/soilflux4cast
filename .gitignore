@@ -44,6 +44,8 @@ vignettes/*.pdf
 # R Environment Variables
 .Renviron
 
+# data files
+/data/
 
 # process files
 /process/
