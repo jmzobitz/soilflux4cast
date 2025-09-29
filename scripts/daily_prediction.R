@@ -59,7 +59,6 @@ input_forecast_null <- forecast_data |>
          value = null_model(TSOIL)) |>
   select(-all_of(env_vars))
 
-forecast_file <- paste0('data/outputs/forecast_prediction-',forecast_date,'.csv')
 
 ### Now do a linear model based on last month's data
 source('R/drivers_available.R')
@@ -100,6 +99,7 @@ input_forecast_lm <- forecast_data |>
 
 ####
 
+forecast_file <- paste0('data/outputs/forecast_prediction-',forecast_date,'.csv')
 
 # glob forecasts together
 input_forecast <- rbind(input_forecast_null,input_forecast_lm)
