@@ -1,20 +1,27 @@
 
 
 
-#' targets_available is a helper function returns available dates (months) for target forecast on the soilflux4cast repo.  Uses httr JSONLite and stringR
+#' targets_available is a helper function returns available soil fluxes on the soilflux4cast repo.  Uses httr JSONLite and stringR
 #'
+#' @param dates vector of dates to build target in YYYY-MM
+#' 
 #' @import httr
 #' @import jsonlite
 #' @import stringr
 #' @import purrr
-#' @returns a string of dates
+#' @import dplyr
+#' @import tidyr
+#'
+#' @returns a tible of fluxes with their startDateTime, flux, and flux_err
 #' @export
 #'
 #' @examples
-#' gef_dates()
-targets_available <- function() {
+
+targets_available <- function(dates) {
   
   
+  # Build regex: match dates at the end before ".csv"
+  pattern <- paste0("(", paste(dates, collapse = "|"), ")\\.csv$")
   
   # Define repo and path
   repo <- "jmzobitz/soilflux4cast"
@@ -28,11 +35,13 @@ targets_available <- function() {
   files <- jsonlite::fromJSON(httr::content(res, "text", encoding = "UTF-8"))
   
   # View file names
-  files$name |>
-    stringr::str_subset(pattern="(?<=neon_targets-)[:digit:]{4}-[:digit:]{2}" ) |>
-    purrr::discard(is.na)
-  
-  
-  
+  download_files <- files |>
+    dplyr::filter(stringr::str_detect(name,pattern="(?<=neon_targets-)[:digit:]{4}-[:digit:]{2}" )) |>
+    dplyr::filter(stringr::str_detect(download_url, pattern)) |>
+    dplyr::mutate(data = purrr::map(.x=download_url,.f=~readr::read_csv(.x,show_col_types = FALSE))) |>
+    dplyr::select(data) |>
+    tidyr::unnest(cols=c(data))
+    
+  return(download_files)
   
 }
