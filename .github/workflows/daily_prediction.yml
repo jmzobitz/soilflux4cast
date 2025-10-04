@@ -56,6 +56,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
+          # Check if branch has commits ahead of main
+          if [ "$(git rev-list origin/main..$BRANCH --count)" -eq 0 ]; then
+            echo "No new commits between main and $BRANCH — skipping PR creation."
+            exit 0
+          fi
+          
           # Only create PR if it doesn't already exist
           if gh pr view $BRANCH --json number > /dev/null 2>&1; then
             echo "PR already exists for $BRANCH"
