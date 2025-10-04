@@ -19,6 +19,8 @@
 
 targets_available <- function(dates=NULL) {
   
+  # Build regex: match dates at the end before ".csv"
+  pattern <- paste0("(", paste(dates, collapse = "|"), ")\\.csv$")
   
   # Define repo and path
   repo <- "jmzobitz/soilflux4cast"
