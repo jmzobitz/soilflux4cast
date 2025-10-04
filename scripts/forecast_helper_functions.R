@@ -47,6 +47,23 @@ noaa_mean_historical <- function(site,
 }
 
 
+# the function plot noaa
+plot_noaa <- function(noaa_data,
+                      measurement,
+                      site) {
+  
+  noaa_data |>
+    dplyr::filter(site_id == site,
+                  noaa == measurement)  |>
+    ggplot2::ggplot(aes(x = datetime, y = value)) +
+    ggplot2::geom_point() +
+    ggplot2::ylab(measurement) +
+    ggplot2::scale_x_date(date_labels = "%Y-%m-%d") +
+    ggplot2::ggtitle(site)
+  
+  
+}
+
 # Plot together a variable with the forecast target
 plot_target_noaa <- function(target_data,
                              noaa_data,
