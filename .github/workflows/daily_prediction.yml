@@ -23,8 +23,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libcurl4-openssl-dev
         
       - name: Install needed R packages
-        run: Rscript -e 'install.packages(c("curl","readr","dplyr","tidyr","stringr","glue","arrow"), repos = "https://cloud.r-project.org")'
-
+        run: Rscript -e 'install.packages(c("curl","readr","dplyr","tidyr","stringr","glue","arrow","httr","purrr","jsonlite"), repos = "https://cloud.r-project.org")'
 
           
       - name: Set forecast date and output file
