@@ -119,7 +119,7 @@ get_forecast_noaa <- function(site,
   
   weather_future <- weather_future_s3 |> 
     dplyr::filter(datetime >= forecast_date,
-                  site_id %in% focal_sites,
+                  site_id %in% site,
                   variable %in% met_variables) |> 
     dplyr::collect()
   
