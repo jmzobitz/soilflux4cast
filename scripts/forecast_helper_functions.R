@@ -13,6 +13,7 @@ plot_targets <- function(target_data,
     dplyr::filter(site_id == site,
                   lubridate::year(datetime) %in% year,
                   variable == measurement)  |>
+    dplyr::mutate(datetime = as.Date(datetime)) |>
     ggplot2::ggplot(aes(x = datetime, y = observation)) +
     ggplot2::geom_point() +
     ggplot2::ylab(measurement) +
