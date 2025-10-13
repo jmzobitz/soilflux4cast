@@ -143,3 +143,89 @@ make_prediction <- function(noaa_future,
 }
 
 
+# Functions to help in model assessment, adapted from
+# https://github.com/OlssonF/Forecast-evaluation-EFI25/blob/main/tutorial/forecast-evaluation-tutorial.md
+
+
+# This function will compute the relevant stats for a horizon for a given forecast-observation pair
+compute_forecast_stats <- function(forecast,
+                                   targets) {
+  
+  curr_horizon <- targets |>
+    dplyr::pull(duration) |>
+    unique() |>
+    {\(x) ifelse(x == "P1D", "day", "week")}()
+  
+  
+  forecast_start <- forecast |> 
+    dplyr::pull(datetime) |>
+    min() |>
+    lubridate::floor_date(unit="week",week_start = 1)
+  
+  forecast_end <- forecast |> 
+    dplyr::pull(datetime) |>
+    max() 
+  
+  # Create intervals so we can easily figure out where each forecast goes
+  interval_starts <- seq(from = forecast_start, to = forecast_end, by = curr_horizon)
+  
+  if( curr_horizon == "week") {
+    interval_ends <- interval_starts + lubridate::weeks(2)
+  } else {
+    interval_ends <- interval_starts + lubridate::days(1)
+  }
+  
+  interval_length <- lubridate::interval(interval_starts[interval_ends <= forecast_end], interval_ends[interval_ends <= forecast_end])
+  
+  forecast_ref_time <- forecast$reference_datetime[[1]]  # When the forecast was made
+  
+  targets_adj <- targets |>
+    dplyr::filter(between(datetime,forecast_start,forecast_end)) |>
+    dplyr::mutate(interval_id = sapply(datetime, function(d)
+      which(lubridate::`%within%`(d, interval_length))[1])) |>
+    tidyr::drop_na()
+  
+  forecast |>
+    dplyr::mutate(interval_id = sapply(datetime, function(d)
+      which(lubridate::`%within%`(d, interval_length))[1])) |>
+    tidyr::drop_na() |>
+    dplyr::group_by(site_id,variable,interval_id) |>
+    dplyr::reframe(value =
+                     stats::quantile(prediction,na.rm=TRUE,probs = c(0.025,0.10,0.5,0.9,.975),
+                     ),
+                   name = c("q0.025", "q0.10","q0.5", "q0.90","q0.975"),
+                   mean = mean(prediction, na.rm = TRUE),
+                   sd = sd(prediction, na.rm = TRUE)
+    ) |> 
+    tidyr::pivot_wider() |>
+    dplyr::inner_join(drop_na(targets_adj),by=c("site_id","interval_id","variable")) |>
+    dplyr::mutate(crps = purrr::map2_dbl(.x=mean,.y=observation,.f=~{
+      s <- 0
+      for (i in seq_along(.x)) {
+        for (j in seq_along(.x)) {
+          s <- s + abs(.x[i] - .x[j])
+        }
+      }
+      mean(abs(.x - .y)) - s / (2 * length(.x)^2)
+    }),
+    reference_datetime = lubridate::as_date(forecast_ref_time) ) |>
+    dplyr::relocate(datetime,observation,reference_datetime,.after = site_id) |>
+    dplyr::select(-project_id,-duration,-interval_id) |>
+    dplyr::ungroup()
+  
+  
+  
+}
+
+# Find the percentage of measurements within the confidence intervals
+compute_reliability <- function(single_forecast) {
+  
+  single_forecast |> 
+    dplyr::mutate(within_PI = dplyr::between(observation, q0.025, q0.975)) |> 
+    dplyr::group_by(site_id) |> 
+    dplyr::summarise(within_TRUE = mean(within_PI)*100,
+                     within_FALSE = mean(!within_PI)*100,
+                     
+                     .groups = 'drop')
+  
+}
