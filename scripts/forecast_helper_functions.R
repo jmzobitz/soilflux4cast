@@ -90,12 +90,10 @@ fit_lm_model <- function(target_data,
                          regression_equation) {
   
   noaa <- noaa_data |>
-    tidyr::pivot_wider(names_from = noaa,values_from = value) |>
-    na.omit()
+    tidyr::pivot_wider(names_from = noaa,values_from = value) 
   
   target <- target_data |> 
-    tidyr::pivot_wider(names_from = variable,values_from = observation) |>
-    na.omit()
+    tidyr::pivot_wider(names_from = variable,values_from = observation) 
   
   data_together <- noaa |>
     dplyr::inner_join(target,by=c("site_id","datetime"))
