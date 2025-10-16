@@ -132,7 +132,7 @@ make_prediction <- function(noaa_future,
                             target_variable) {
   
   
-  future_data |> 
+  noaa_future |> 
     dplyr::mutate(prediction = predict(fit_model, noaa_future),
                   variable = target_variable) |>
     dplyr::select(parameter,datetime,family,site_id,reference_datetime,prediction,variable)
