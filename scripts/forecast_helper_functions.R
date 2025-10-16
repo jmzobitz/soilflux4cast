@@ -226,3 +226,152 @@ compute_reliability <- function(single_forecast) {
                      .groups = 'drop')
   
 }
+
+## EnFK adapted from 
+# https://github.com/MacrosystemsEDDIE/module7_R/blob/main/assignment/R/EnKF_and_plot_functions.R
+
+EnKF <- function(forecast, 
+                 new_observation, 
+                 ic_sd){
+  
+  #Allocate matrices - everything has to be converted to 
+  #a matrix to do the matrix math required for the ensemble Kalman filter
+  x_corr <- matrix(forecast)
+  y <- matrix(new_observation)
+  h_matrix <- matrix(0, nrow = 1, ncol = 1)
+  R_matrix <- matrix(0, nrow = 1, ncol = 1)
+  dit <- matrix(NA, nrow = length(x_corr[,1]), ncol = 1) 
+  y_corr <- matrix(NA, nrow =  length(x_corr[,1]), ncol = length(y))
+  x_update <- matrix(NA, nrow = length(x_corr[,1]), ncol = 1)
+  
+  #Only do EnKF if observations are present that day
+  #there has to be at least 1 non-NA observation.
+  if(length(which(!is.na(y))) > 0){
+    
+    #Assign observations to depths
+    h_matrix[1, 1] <- 1
+    
+    #Create observational uncertainty matrix
+    R_matrix[1,1] <- ic_sd^2
+    
+    #Calculate mean prediction for each depth
+    ens_mean <- colMeans(x_corr)
+    
+    #Loop through ensemble members
+    for(m in 1:length(x_corr[,1])){  
+      #Ensemble specific deviation
+      dit[m, ] <- x_corr[m, ] - ens_mean
+      
+      #if the first ensemble then create the matrix that is then averaged
+      if(m == 1){
+        p_it <- dit[m, ] %*% t(dit[m, ]) 
+      }else{
+        #if not the first ensemble then add the matrix to the previous matrix
+        p_it <- dit[m, ] %*% t(dit[m, ]) +  p_it 
+      }
+    }
+    
+    #Calculate Cxx matrix
+    Cxx_matrix <- p_it / (length(x_corr[,1]) - 1)
+    
+    #Add noise to observations
+    for(m in 1:length(x_corr[,1])){
+      y_corr[m, ] <- y + t(rmvnorm(n = 1, mean = c(0), sigma = R_matrix))
+    }
+    
+    #Calculate Kalman Gain
+    K <- Cxx_matrix %*% t(h_matrix) %*% solve(h_matrix %*% Cxx_matrix %*% t(h_matrix) + R_matrix)
+    
+    #Update model states based on Kalman Gain and devivations
+    for(m in 1:length(x_corr[,1])){
+      x_update[m, ] <- x_corr[m,] + K %*% (y_corr[m,] - h_matrix %*% x_corr[m,])
+    }
+  }else{
+    #Only add noise if observations are missing
+    x_update <- x_corr
+  }
+  
+  ic_update <- c(x_update[,1])
+  return(ic_update)
+}
+
+
+### Applies the ENKF with a given standard deviation
+
+iterate_forecast <- function(forecast,
+                             targets,
+                             ic_sd) {
+  
+  curr_horizon <- targets |>
+    dplyr::pull(duration) |>
+    unique() |>
+    {\(x) ifelse(x == "P1D", "day", "week")}()
+  
+  
+  forecast_start <- forecast |> 
+    dplyr::pull(datetime) |>
+    min() |>
+    lubridate::floor_date(unit="week",week_start = 1)
+  
+  forecast_end <- forecast |> 
+    dplyr::pull(datetime) |>
+    max() 
+  
+  # Create intervals so we can easily figure out where each forecast goes
+  interval_starts <- seq(from = forecast_start, to = forecast_end, by = curr_horizon)
+  
+  if( curr_horizon == "week") {
+    interval_ends <- interval_starts + lubridate::weeks(2)
+  } else {
+    interval_ends <- interval_starts + lubridate::days(1)
+  }
+  
+  interval_length <- lubridate::interval(interval_starts[interval_ends <= forecast_end], interval_ends[interval_ends <= forecast_end])
+  
+  forecast_ref_time <- forecast$reference_datetime[[1]]  # When the forecast was made
+  
+  targets_adj <- targets |>
+    dplyr::filter(between(datetime,forecast_start,forecast_end)) |>
+    dplyr::mutate(interval_id = sapply(datetime, function(d)
+      which(lubridate::`%within%`(d, interval_length))[1])) |>
+    tidyr::drop_na() |>
+    dplyr::group_by(site_id,variable,interval_id) |>
+    nest()
+  
+  forecasts_nest <- forecast |>
+    dplyr::mutate(interval_id = sapply(datetime, function(d)
+      which(lubridate::`%within%`(d, interval_length))[1])) |>
+    tidyr::drop_na() |>
+    dplyr::group_by(site_id,variable,interval_id) |>
+    nest()
+  
+  
+  forecasts_nest |>
+    left_join(targets_adj,by=c("site_id","variable","interval_id")) |>
+    mutate(new_data = map2(.x=data.x,.y=data.y,.f=function(x,y) {
+      
+      if(is.null(y)) {
+        return(x)
+      } else {
+        
+        old_forecast <- x$prediction
+        new_obs <- y$observation
+        x$prediction <- EnKF(old_forecast,new_obs,ic_sd) 
+        
+        return(x)
+        
+      }
+      
+    })) |>
+    select(-data.x,-data.y,-interval_id) |>
+    unnest(cols=c(new_data)) |>
+    ungroup()
+  
+  
+  
+  
+  
+}
+
+
+
