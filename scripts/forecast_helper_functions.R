@@ -120,7 +120,8 @@ get_forecast_noaa <- function(site,
     dplyr::filter(datetime >= forecast_date,
                   site_id %in% site,
                   variable %in% met_variables) |> 
-    dplyr::collect()
+    dplyr::collect()  |>
+    tidyr::pivot_wider(names_from = variable,values_from = prediction)
   
   
 }
@@ -130,11 +131,9 @@ make_prediction <- function(noaa_future,
                             fit_model,
                             target_variable) {
   
-  future_data <- noaa_future |>
-    tidyr::pivot_wider(names_from = variable,values_from = prediction)
   
   future_data |> 
-    dplyr::mutate(prediction = predict(fit_model, future_data),
+    dplyr::mutate(prediction = predict(fit_model, noaa_future),
                   variable = target_variable) |>
     dplyr::select(parameter,datetime,family,site_id,reference_datetime,prediction,variable)
   
