@@ -109,7 +109,8 @@ fit_lm_model <- function(target_data,
 # Now forecast on the site
 get_forecast_noaa <- function(site,
                               forecast_date,
-                              met_variables) {
+                              met_variables,
+                              duration) {
   
   forecast_date <- as.Date(forecast_date) 
   noaa_date <- forecast_date - lubridate::days(1)
@@ -123,7 +124,17 @@ get_forecast_noaa <- function(site,
     dplyr::collect()  |>
     tidyr::pivot_wider(names_from = variable,values_from = prediction)
   
+  if(!missing(duration)) {
+    if(duration == "P1D") {
+      weather_future <- weather_future |>
+        dplyr::filter(datetime <= forecast_date + lubridate::days(1))
+    } else{   # weekly duration - we want to go two weeks forward
+      weather_future <- weather_future |>
+        dplyr::filter(datetime <= forecast_date + lubridate::weeks(2))
+    }
+  }
   
+  return(weather_future)
 }
 
 # Make a prediction based on a model
@@ -276,7 +287,7 @@ EnKF <- function(forecast,
     
     #Add noise to observations
     for(m in 1:length(x_corr[,1])){
-      y_corr[m, ] <- y + t(rmvnorm(n = 1, mean = c(0), sigma = R_matrix))
+      y_corr[m, ] <- y + t(mvtnorm::rmvnorm(n = 1, mean = c(0), sigma = R_matrix))
     }
     
     #Calculate Kalman Gain
@@ -373,5 +384,122 @@ iterate_forecast <- function(forecast,
   
 }
 
+# This function grabs target data between a specified start and end date for a site
 
+get_forecast_data <- function(start_date,end_date,target_name,site_name) {
+  
+  which_target <- tibble(
+    variables = c("abundance","richness","gcc_90","rcc_90","chla","oxygen","temperature","le","nee"),
+    
+    targets = c("beetles","beetles","phenology" ,"phenology","aquatics","aquatics","aquatics","fluxes","fluxes")
+  ) |>
+    filter(variables %in% target_name) |>
+    pull(targets) |> unique()
+  
+  tibble(
+    name = c("beetles","phenology","aquatics","fluxes"),
+    url = c("https://sdsc.osn.xsede.org/bio230014-bucket01/challenges/targets/project_id=neon4cast/duration=P1W/beetles-targets.csv.gz",
+            "https://sdsc.osn.xsede.org/bio230014-bucket01/challenges/targets/project_id=neon4cast/duration=P1D/phenology-targets.csv.gz",
+            "https://sdsc.osn.xsede.org/bio230014-bucket01/challenges/targets/project_id=neon4cast/duration=P1D/aquatics-targets.csv.gz",
+            "https://sdsc.osn.xsede.org/bio230014-bucket01/challenges/targets/project_id=neon4cast/duration=P1D/terrestrial_daily-targets.csv.gz")
+  ) |>
+    filter(name %in% which_target) |>
+    mutate(data = map(.x=url,.f=~(read_csv(.x, show_col_types = FALSE)))) |>
+    select(-url) |>
+    mutate(target_names = map(.x=data,.f=~(.x |> pull(variable) |> unique()))) |>
+    unnest(cols=c("target_names")) |>
+    filter(target_names %in% target_name) |>
+    mutate(data2 = map(.x=data, .f=~(.x |> filter(variable %in% target_name,
+                                                  between(datetime,as.Date(start_date),as.Date(end_date)),
+                                                  site_id %in% site_name
+    )
+    )
+    )
+    ) |> 
+    pull(data2) |>
+    bind_rows() |>
+    ungroup()
+  
+  
+}
 
+# And the whole forecast cycle!
+forecast_cycle <- function(start_date,end_date,forecast_variable,site_name,model_fn,noaa_vars,parameter_unc = FALSE,process_unc = 0) {
+  
+  predictions <- get_forecast_data(start_date,end_date,forecast_variable,site_name) |>
+    dplyr::mutate(noaa = purrr::pmap(.l=list(site_id,datetime,duration),
+                                     .f=~get_forecast_noaa(..1,..2,noaa_vars,..3))) |>
+    dplyr::mutate(next_eval = datetime + dplyr::if_else(duration == "P1D",lubridate::days(1),lubridate::weeks(2)))
+  
+  print("Acquired targets data and NOAA data.")
+  
+  # Now add the NOAA data
+  predictions_noaa <- predictions |>
+    dplyr::mutate(
+      pred = purrr::map(noaa, ~ {
+        # keep only columns that model_fn actually accepts
+        allowed_args <- intersect(names(.x), names(formals(model_fn)))
+        args <- dplyr::select(.x, dplyr::all_of(allowed_args))
+        
+        # add additional fixed argument
+        args$uncertainty <- parameter_unc  # or FALSE
+        
+        n_obs <- nrow(.x)  # This counts the rows we are working with
+        
+        
+        # call model_fn safely
+        .x |>
+          dplyr::mutate(prediction = do.call(model_fn, as.list(args))) |>
+          dplyr::select(parameter, datetime, family, site_id, reference_datetime, prediction) |>
+          dplyr::mutate(prediction = prediction + rnorm(n_obs,sd = process_sd))
+      })
+    )
+  
+  print("Made predictions with NOAA data, using specified parameter and process uncertainty.")
+  
+  
+  
+  # Now we do the model updates to the next timestep
+  
+  predictions_stats <- predictions_noaa |> 
+    dplyr::mutate(forecast_stats = purrr::map2(.x=next_eval,.y=pred,.f=~(.y |> 
+                                                                           dplyr::filter(datetime == .x) |> 
+                                                                           dplyr::reframe(value =
+                                                                                            stats::quantile(prediction,na.rm=TRUE,probs = c(0.025,0.10,0.5,0.9,.975),
+                                                                                            ),
+                                                                                          name = c("q0.025", "q0.10","q0.5", "q0.90","q0.975"),
+                                                                                          mean = mean(prediction, na.rm = TRUE),
+                                                                                          sd = sd(prediction, na.rm = TRUE)
+                                                                           ) |> 
+                                                                           tidyr::pivot_wider() |>
+                                                                           dplyr::ungroup()
+    )
+    )
+    ) |>
+    dplyr::select(next_eval,forecast_stats) |>
+    tidyr::unnest(cols=c("forecast_stats"))
+  
+  
+  # Now go and pull in the predictions when the next obs occurs
+  predictions_forecast <- predictions_stats |>
+    dplyr::inner_join(select(predictions_noaa,site_id,datetime,observation),by=c("next_eval" = "datetime")) |> 
+    dplyr::mutate(crps = purrr::map2_dbl(.x=mean,.y=observation,.f=~{
+      s <- 0
+      for (i in seq_along(.x)) {
+        for (j in seq_along(.x)) {
+          s <- s + abs(.x[i] - .x[j])
+        }
+      }
+      mean(abs(.x - .y)) - s / (2 * length(.x)^2)
+    }) ) |>
+    dplyr::rename(datetime = next_eval)
+  
+  print("Forecast reliability over the timeperiod:")
+  print(compute_reliability(predictions_forecast))
+  
+  
+  return(predictions_forecast)
+  
+  
+  
+}
