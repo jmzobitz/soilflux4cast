@@ -448,15 +448,18 @@ forecast_cycle <- function(start_date,
         allowed_args <- intersect(names(.x), names(formals(model_fn)))
         args <- dplyr::select(.x, dplyr::all_of(allowed_args))
         
+        
+        
+        inputs <- as.list(args)
         # add additional fixed argument
-        args$uncertainty <- parameter_unc  # or FALSE
+        inputs$uncertainty <- parameter_unc  # or FALSE
         
         n_obs <- nrow(.x)  # This counts the rows we are working with
         
-        
+     
         # call model_fn safely
         .x |>
-          dplyr::mutate(prediction = do.call(model_fn, as.list(args))) |>
+          dplyr::mutate(prediction = do.call(model_fn, inputs)) |>
           dplyr::select(parameter, datetime, family, site_id, reference_datetime, prediction) |>
           dplyr::mutate(prediction = prediction + rnorm(n_obs,sd = process_sd))
       })
