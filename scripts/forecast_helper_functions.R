@@ -424,7 +424,14 @@ get_forecast_data <- function(start_date,end_date,target_name,site_name) {
 }
 
 # And the whole forecast cycle!
-forecast_cycle <- function(start_date,end_date,forecast_variable,site_name,model_fn,noaa_vars,parameter_unc = FALSE,process_unc = 0) {
+forecast_cycle <- function(start_date,
+                           end_date,
+                           forecast_variable,
+                           site_name,
+                           model_fn,
+                           noaa_vars,
+                           parameter_unc = FALSE,
+                           process_unc = 0) {
   
   predictions <- get_forecast_data(start_date,end_date,forecast_variable,site_name) |>
     dplyr::mutate(noaa = purrr::pmap(.l=list(site_id,datetime,duration),
