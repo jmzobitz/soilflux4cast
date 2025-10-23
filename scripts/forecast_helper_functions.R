@@ -231,8 +231,8 @@ compute_reliability <- function(single_forecast) {
   single_forecast |> 
     dplyr::mutate(within_PI = dplyr::between(observation, q0.025, q0.975)) |> 
     dplyr::group_by(site_id) |> 
-    dplyr::summarise(within_TRUE = mean(within_PI)*100,
-                     within_FALSE = mean(!within_PI)*100,
+    dplyr::summarise(within_TRUE = mean(within_PI,na.rm=TRUE)*100,
+                     within_FALSE = mean(!within_PI,na.rm=TRUE)*100,
                      
                      .groups = 'drop')
   
