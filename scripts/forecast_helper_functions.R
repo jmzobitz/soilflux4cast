@@ -440,8 +440,28 @@ forecast_cycle <- function(start_date,
   
   print("Acquired targets data and NOAA data.")
   
-  # Now add the NOAA data
+  no_forecast <- predictions |>
+    dplyr::mutate(
+      obs_avail = purrr::map_lgl(.x = observation, .f = is.numeric),
+      noaa_avail = purrr::map_lgl(.x = noaa, .f = ~ (nrow(.x) > 0))
+    ) |>
+    dplyr::filter(!obs_avail | !noaa_avail) |>
+    dplyr::select(datetime, next_eval, obs_avail, noaa_avail)
+  
+  print("No forecast-observation pairs for the following dates:")
+  
+  print(no_forecast)
+  
+  
+  
+  # Now add the NOAA data, filtering out the places where there are no forecast observation pairs:
   predictions_noaa <- predictions |>
+    dplyr::mutate(
+      obs_avail = purrr::map_lgl(.x = observation, .f = is.numeric),
+      noaa_avail = purrr::map_lgl(.x = noaa, .f = ~ (nrow(.x) > 0))
+    ) |>
+    dplyr::filter(obs_avail & noaa_avail) |>
+    dplyr::select(-noaa_avail, -obs_avail) |>
     dplyr::mutate(
       pred = purrr::map(noaa, ~ {
         # keep only columns that model_fn actually accepts
