@@ -31,13 +31,13 @@ jobs:
 
       - name: Install CRAN packages
         run: |
-          Rscript -e 'install.packages(c("neonUtilities", "tidyverse", "devtools"), repos = "https://cloud.r-project.org")'
+          Rscript -e 'install.packages(c("neonUtilities", "tidyverse", "devtools","neonSoilFlux"), repos = "https://cloud.r-project.org")'
 
-      - name: Install neonSoilFlux from GitHub
-        env:
-          GITHUB_PAT: ${{ secrets.PAT_TOKEN }}
-        run: |
-          Rscript -e 'devtools::install_github("jmzobitz/neonSoilFlux", auth_token = Sys.getenv("GITHUB_PAT"))'
+#      - name: Install neonSoilFlux from GitHub
+#        env:
+#          GITHUB_PAT: ${{ secrets.PAT_TOKEN }}
+#        run: |
+#          Rscript -e 'devtools::install_github("jmzobitz/neonSoilFlux", auth_token = Sys.getenv("GITHUB_PAT"))'
 
       - name: Set NEON_DATE to last month
         run: echo "NEON_DATE=$(date -d 'last month' +%Y-%m)" >> $GITHUB_ENV
