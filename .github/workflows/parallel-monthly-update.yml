@@ -48,13 +48,17 @@ jobs:
               "https://raw.githubusercontent.com/eco4cast/neon4cast-targets/main/NEON_Field_Site_Metadata_20220412.csv",
               show_col_types = FALSE
             )
-            terrestrial_sites <- d %>% filter(terrestrial == 1) %>% pull(field_site_id)
+            terrestrial_sites <- d |> filter(terrestrial == 1) |> pull(field_site_id)
             # Output JSON as single line
             cat(jsonlite::toJSON(terrestrial_sites, auto_unbox=TRUE))
           ')
           # Strip any newlines (just in case)
-          SITES=$(echo $SITES | tr -d '\n')
+          SITES=$(echo $SITES | tr -d '\r\n')
+          echo "DEBUG: sites=$SITES
           echo "sites=$SITES" >> $GITHUB_OUTPUT
+
+
+
 
 
   process-site:
