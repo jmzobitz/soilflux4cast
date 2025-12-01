@@ -42,6 +42,7 @@ jobs:
               packages = c("tidyverse", "jsonlite"),
               prompt = FALSE
             )
+          '
 
       - name: Get list of NEON site_ids
         id: get_sites
@@ -94,6 +95,7 @@ jobs:
               packages = c("tidyverse", "neonUtilities","neonSoilFlux"),
               prompt = FALSE
             )
+          '
 
       - name: Determine month
         id: determine_month
@@ -148,6 +150,7 @@ jobs:
               packages = c("tidyverse", "neonUtilities","neonSoilFlux"),
               prompt = FALSE
             )
+          '
 
       - name: Download all site artifacts
         uses: actions/download-artifact@v4
