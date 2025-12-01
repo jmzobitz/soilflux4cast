@@ -111,8 +111,8 @@ jobs:
         with:
           name: site-${{ matrix.site }}
           path: |
-            data/drivers/neon/soil_drivers-${{ steps.determine_month.outputs.month }}-${{ matrix.site }}.csv
-            data/targets/neon/forecast_prediction-${{ steps.determine_month.outputs.month }}-${{ matrix.site }}.csv
+            data/drivers/neon/soil_drivers-${{ matrix.site }}-${{ steps.determine_month.outputs.month }}.csv
+            data/targets/neon/forecast_prediction-${{ matrix.site }}-${{ steps.determine_month.outputs.month }}.csv
 
 
   reduce:
