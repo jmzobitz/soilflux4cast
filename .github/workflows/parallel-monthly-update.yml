@@ -53,7 +53,7 @@ jobs:
             cat(jsonlite::toJSON(terrestrial_sites, auto_unbox=TRUE))
           ')
           # Strip any newlines (just in case)
-          SITES=$(echo $SITES | tr -d '\n')
+          SITES=$(echo $SITES | tr -d '\r\n')  # strip newlines
           echo "sites=$SITES" >> $GITHUB_OUTPUT
 
 
