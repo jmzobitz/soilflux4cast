@@ -33,11 +33,15 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libgdal-dev libproj-dev libgeos-dev
 
-      - name: Install renv
-        run: Rscript -e 'install.packages("renv", repos="https://cloud.r-project.org")'
-
-      - name: Restore R packages from renv.lock
-        run: Rscript -e 'renv::restore(prompt = FALSE)'
+      - name: Restore only needed R packages
+        run: |
+          Rscript -e '
+            install.packages("renv", repos="https://cloud.r-project.org")
+            source("renv/activate.R")
+            renv::restore(
+              packages = c("tidyverse", "jsonlite"),
+              prompt = FALSE
+            )
 
       - name: Get list of NEON site_ids
         id: get_sites
@@ -81,11 +85,15 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libgdal-dev libproj-dev libgeos-dev
 
-      - name: Install renv
-        run: Rscript -e 'install.packages("renv", repos="https://cloud.r-project.org")'
-
-      - name: Restore R packages from renv.lock
-        run: Rscript -e 'renv::restore()'
+      - name: Restore only needed R packages
+        run: |
+          Rscript -e '
+            install.packages("renv", repos="https://cloud.r-project.org")
+            source("renv/activate.R")
+            renv::restore(
+              packages = c("tidyverse", "neonUtilities","neonSoilFlux"),
+              prompt = FALSE
+            )
 
       - name: Determine month
         id: determine_month
@@ -131,11 +139,15 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libgdal-dev libproj-dev libgeos-dev
 
-      - name: Install renv
-        run: Rscript -e 'install.packages("renv", repos="https://cloud.r-project.org")'
-
-      - name: Restore R packages from renv.lock
-        run: Rscript -e 'renv::restore()'
+      - name: Restore only needed R packages
+        run: |
+          Rscript -e '
+            install.packages("renv", repos="https://cloud.r-project.org")
+            source("renv/activate.R")
+            renv::restore(
+              packages = c("tidyverse", "neonUtilities","neonSoilFlux"),
+              prompt = FALSE
+            )
 
       - name: Download all site artifacts
         uses: actions/download-artifact@v4
