@@ -18,6 +18,8 @@ permissions:
 jobs:
   determine-sites:
     runs-on: ubuntu-latest
+    outputs:
+      sites: ${{ steps.get_sites.outputs.sites }}
 
     steps:
       - uses: actions/checkout@v3
@@ -34,28 +36,28 @@ jobs:
       - name: Install renv
         run: Rscript -e 'install.packages("renv", repos="https://cloud.r-project.org")'
 
-      - name: Restore R packages
+      - name: Restore R packages from renv.lock
         run: Rscript -e 'renv::restore(prompt = FALSE)'
 
-      - name: Generate list of NEON site_ids
+      - name: Get list of NEON site_ids
+        id: get_sites
         run: |
-          Rscript --vanilla --quiet -e '
-            source("renv/activate.R")
+          SITES=$(Rscript --vanilla --quiet -e '
+            source("renv/activate.R")      # Ensure packages are visible
+            library(tidyverse)
             library(jsonlite)
-            library(readr)
-            d <- read_csv(
+            d <- readr::read_csv(
               "https://raw.githubusercontent.com/eco4cast/neon4cast-targets/main/NEON_Field_Site_Metadata_20220412.csv",
               show_col_types = FALSE
             )
-            terrestrial_sites <- d[d$terrestrial == 1, "field_site_id"][[1]]
-            write(toJSON(terrestrial_sites, auto_unbox = TRUE), "sites.json")
-          '
+            terrestrial_sites <- d |> filter(terrestrial == 1) |> pull(field_site_id)
+            # Output JSON as single line
+            cat(jsonlite::toJSON(terrestrial_sites, auto_unbox=TRUE))
+          ')
+          # Strip any newlines (just in case)
+          #SITES=$(echo $SITES | tr -d '\r\n')  # strip newlines
+          echo "sites=$SITES" >> $GITHUB_OUTPUT
 
-      - name: Upload sites artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: sites-json
-          path: sites.json
 
   process-site:
     needs: determine-sites
@@ -63,7 +65,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        site: []
+        site: ${{ fromJson(needs.determine-sites.outputs.sites) }}
+    outputs:
+      site: ${{ matrix.site }}
 
     steps:
       - uses: actions/checkout@v3
@@ -80,23 +84,8 @@ jobs:
       - name: Install renv
         run: Rscript -e 'install.packages("renv", repos="https://cloud.r-project.org")'
 
-      - name: Restore R packages
+      - name: Restore R packages from renv.lock
         run: Rscript -e 'renv::restore()'
-
-      - name: Download sites artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: sites-json
-          path: .
-
-      - name: Load sites for matrix
-        id: load_sites
-        run: |
-          echo "SITES_JSON=$(cat sites.json)" >> $GITHUB_ENV
-
-      - name: Set matrix dynamically
-        run: |
-          echo "matrix=$(echo $SITES_JSON | jq -r '.')" >> $GITHUB_ENV
 
       - name: Determine month
         id: determine_month
@@ -122,6 +111,7 @@ jobs:
             data/drivers/neon/soil_drivers-${{ steps.determine_month.outputs.month }}-${{ matrix.site }}.csv
             data/targets/neon/forecast_prediction-${{ steps.determine_month.outputs.month }}-${{ matrix.site }}.csv
 
+
   reduce:
     needs: process-site
     runs-on: ubuntu-latest
@@ -141,7 +131,7 @@ jobs:
       - name: Install renv
         run: Rscript -e 'install.packages("renv", repos="https://cloud.r-project.org")'
 
-      - name: Restore R packages
+      - name: Restore R packages from renv.lock
         run: Rscript -e 'renv::restore()'
 
       - name: Download all site artifacts
