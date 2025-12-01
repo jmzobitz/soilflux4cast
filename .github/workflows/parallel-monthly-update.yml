@@ -32,7 +32,7 @@ jobs:
       - name: Get list of NEON site_ids
         id: get_sites
         run: |
-          Rscript --vanilla <<'EOF'
+          SITES=$(Rscript --vanilla --quiet -e '
             library(tidyverse)
             library(jsonlite)
             d <- read_csv(
@@ -40,10 +40,9 @@ jobs:
               show_col_types = FALSE
             )
             terrestrial_sites <- d |> filter(terrestrial == 1) |> pull(field_site_id)
-            write(jsonlite::toJSON(terrestrial_sites, auto_unbox=TRUE), "sites.json")
-          EOF
-          SITES=$(cat sites.json)
-          echo "sites=$SITES" >> $GITHUB_OUTPUT      
+            cat(jsonlite::toJSON(terrestrial_sites, auto_unbox=TRUE))
+          ')
+          echo "sites=$SITES" >> $GITHUB_OUTPUT
 
 
   process-site:
