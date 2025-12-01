@@ -25,8 +25,8 @@ jobs:
       - uses: actions/checkout@v3
 
       - uses: r-lib/actions/setup-r@v2
-        with:
-          r-version: "4.4.1"
+        #with:
+        #  r-version: "4.4.1"
 
       - name: Install system dependencies for terra
         run: |
@@ -73,8 +73,8 @@ jobs:
       - uses: actions/checkout@v3
 
       - uses: r-lib/actions/setup-r@v2
-        with:
-          r-version: "4.4.1"
+        #with:
+        #  r-version: "4.4.1"
 
       - name: Install system dependencies for terra
         run: |
@@ -120,8 +120,8 @@ jobs:
       - uses: actions/checkout@v3
 
       - uses: r-lib/actions/setup-r@v2
-        with:
-          r-version: "4.4.1"
+        #with:
+        #  r-version: "4.4.1"
 
       - name: Install system dependencies for terra
         run: |
