@@ -18,11 +18,10 @@ permissions:
 jobs:
   determine-sites:
     runs-on: ubuntu-latest
-    outputs:
-      sites_json: ${{ steps.get_sites.outputs.sites_json }}
 
     steps:
       - uses: actions/checkout@v3
+
       - uses: r-lib/actions/setup-r@v2
         with:
           r-version: "4.4.1"
@@ -35,13 +34,12 @@ jobs:
       - name: Install renv
         run: Rscript -e 'install.packages("renv", repos="https://cloud.r-project.org")'
 
-      - name: Restore R packages from renv.lock
+      - name: Restore R packages
         run: Rscript -e 'renv::restore(prompt = FALSE)'
 
-      - name: Get list of NEON site_ids
-        id: get_sites
+      - name: Generate list of NEON site_ids
         run: |
-          sites_json=$(Rscript --vanilla --quiet -e '
+          Rscript --vanilla --quiet -e '
             source("renv/activate.R")
             library(jsonlite)
             library(readr)
@@ -50,9 +48,14 @@ jobs:
               show_col_types = FALSE
             )
             terrestrial_sites <- d[d$terrestrial == 1, "field_site_id"][[1]]
-            cat(toJSON(terrestrial_sites, auto_unbox = TRUE))
-          ')
-          echo "sites_json=$sites_json" >> $GITHUB_OUTPUT
+            write(toJSON(terrestrial_sites, auto_unbox = TRUE), "sites.json")
+          '
+
+      - name: Upload sites artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sites-json
+          path: sites.json
 
   process-site:
     needs: determine-sites
@@ -60,12 +63,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        site: ${{ fromJson(needs.determine-sites.outputs.sites_json) }}
-    outputs:
-      site: ${{ matrix.site }}
+        site: []
 
     steps:
       - uses: actions/checkout@v3
+
       - uses: r-lib/actions/setup-r@v2
         with:
           r-version: "4.4.1"
@@ -78,8 +80,23 @@ jobs:
       - name: Install renv
         run: Rscript -e 'install.packages("renv", repos="https://cloud.r-project.org")'
 
-      - name: Restore R packages from renv.lock
+      - name: Restore R packages
         run: Rscript -e 'renv::restore()'
+
+      - name: Download sites artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: sites-json
+          path: .
+
+      - name: Load sites for matrix
+        id: load_sites
+        run: |
+          echo "SITES_JSON=$(cat sites.json)" >> $GITHUB_ENV
+
+      - name: Set matrix dynamically
+        run: |
+          echo "matrix=$(echo $SITES_JSON | jq -r '.')" >> $GITHUB_ENV
 
       - name: Determine month
         id: determine_month
@@ -89,6 +106,7 @@ jobs:
           else
             MONTH=$(date -d "$(date +%Y-%m-01) -1 month" +%Y-%m)
             echo "month=$MONTH" >> $GITHUB_OUTPUT
+          fi
 
       - name: Run single-site processing
         run: |
@@ -110,6 +128,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+
       - uses: r-lib/actions/setup-r@v2
         with:
           r-version: "4.4.1"
@@ -122,7 +141,7 @@ jobs:
       - name: Install renv
         run: Rscript -e 'install.packages("renv", repos="https://cloud.r-project.org")'
 
-      - name: Restore R packages from renv.lock
+      - name: Restore R packages
         run: Rscript -e 'renv::restore()'
 
       - name: Download all site artifacts
