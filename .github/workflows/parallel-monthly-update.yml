@@ -86,8 +86,7 @@ jobs:
             source("renv/activate.R")
             renv::restore(
               packages = c("tidyverse", "neonUtilities","neonSoilFlux"),
-              prompt = FALSE,
-              dependencies = FALSE   # THIS SKIPS GitHub packages
+              prompt = FALSE
             )
           '
 
@@ -144,8 +143,7 @@ jobs:
             source("renv/activate.R")
             renv::restore(
               packages = c("tidyverse"),
-              prompt = FALSE,
-              dependencies = FALSE   # THIS SKIPS GitHub packages
+              prompt = FALSE
             )
           '
 
