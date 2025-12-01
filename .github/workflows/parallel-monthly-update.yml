@@ -34,6 +34,8 @@ jobs:
           sudo apt-get install -y libgdal-dev libproj-dev libgeos-dev
 
       - name: Restore R packages from renv.lock
+        env:
+          GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
         run: Rscript -e 'renv::restore(prompt = FALSE)'
           
 
@@ -80,6 +82,8 @@ jobs:
           sudo apt-get install -y libgdal-dev libproj-dev libgeos-dev
 
       - name: Restore only needed R packages
+        env:
+          GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
         run: |
           Rscript -e '
             install.packages("renv", repos="https://cloud.r-project.org")
@@ -137,6 +141,8 @@ jobs:
           sudo apt-get install -y libgdal-dev libproj-dev libgeos-dev
 
       - name: Restore only needed R packages
+        env:
+          GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
         run: |
           Rscript -e '
             install.packages("renv", repos="https://cloud.r-project.org")
