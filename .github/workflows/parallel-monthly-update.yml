@@ -86,7 +86,8 @@ jobs:
             source("renv/activate.R")
             renv::restore(
               packages = c("tidyverse", "neonUtilities","neonSoilFlux"),
-              prompt = FALSE
+              prompt = FALSE,
+              dependencies = FALSE   # THIS SKIPS GitHub packages
             )
           '
 
@@ -101,15 +102,17 @@ jobs:
           fi
 
       - name: Run single-site processing
+        continue-on-error: true   # ensures workflow continues even if this fails
         run: |
           Rscript scripts/process_single_site.R \
             "${{ matrix.site }}" \
             "${{ steps.determine_month.outputs.month }}"
 
       - name: List files before upload
-        run: ls -R data/drivers/neon data/targets/neon
+        run: ls -R data/drivers/neon data/targets/neon || true
 
       - name: Upload site artifacts
+        if: always()   # ensures upload runs even if previous steps failed
         uses: actions/upload-artifact@v4
         with:
           name: site-${{ matrix.site }}
@@ -140,8 +143,9 @@ jobs:
             install.packages("renv", repos="https://cloud.r-project.org")
             source("renv/activate.R")
             renv::restore(
-              packages = c("tidyverse", "neonUtilities","neonSoilFlux"),
-              prompt = FALSE
+              packages = c("tidyverse"),
+              prompt = FALSE,
+              dependencies = FALSE   # THIS SKIPS GitHub packages
             )
           '
 
