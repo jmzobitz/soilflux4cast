@@ -27,6 +27,7 @@ jobs:
       - uses: r-lib/actions/setup-r@v2
         with:
           r-version: "4.4.1"
+          use-public-rspm: true
 
       - name: Install system dependencies for terra
         run: |
@@ -75,6 +76,7 @@ jobs:
       - uses: r-lib/actions/setup-r@v2
         with:
           r-version: "4.4.1"
+          use-public-rspm: true
 
       - name: Install system dependencies for terra
         run: |
@@ -122,6 +124,7 @@ jobs:
       - uses: r-lib/actions/setup-r@v2
         with:
           r-version: "4.4.1"
+          use-public-rspm: true
 
       - name: Install system dependencies for terra
         run: |
