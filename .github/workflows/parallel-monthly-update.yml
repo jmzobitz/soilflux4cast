@@ -7,7 +7,6 @@ on:
         description: "Month to process (YYYY-MM)"
         required: true
         default: "2025-01"
-
   schedule:
     - cron: "0 10 15 * *"
 
@@ -16,6 +15,9 @@ permissions:
   pull-requests: write
 
 jobs:
+  # -------------------------------------------------------
+  # Determine NEON sites
+  # -------------------------------------------------------
   determine-sites:
     runs-on: ubuntu-latest
     outputs:
@@ -23,36 +25,43 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-
       - uses: r-lib/actions/setup-r@v2
+
+      - name: Install renv
+        run: Rscript -e 'install.packages("renv", repos="https://cloud.r-project.org")'
 
       - name: Install system dependencies for terra
         run: |
           sudo apt-get update
           sudo apt-get install -y libgdal-dev libproj-dev libgeos-dev
 
-      - name: Install renv
-        run: Rscript -e 'install.packages("renv", repos="https://cloud.r-project.org")'
-
       - name: Restore R packages from renv.lock
-        run: Rscript -e 'renv::restore()'
+        run: Rscript -e 'renv::restore(prompt = FALSE)'
 
       - name: Get list of NEON site_ids
         id: get_sites
         run: |
-          SITES=$(Rscript --vanilla --quiet -e '
+          SITES=$(Rscript -e '
+            source("renv/activate.R")      # Ensure packages are visible
             library(tidyverse)
             library(jsonlite)
+
             d <- readr::read_csv(
               "https://raw.githubusercontent.com/eco4cast/neon4cast-targets/main/NEON_Field_Site_Metadata_20220412.csv",
               show_col_types = FALSE
             )
-            terrestrial_sites <- d |> dplyr::filter(terrestrial == 1) |> dplyr::pull(field_site_id)
+
+            terrestrial_sites <- d %>%
+              dplyr::filter(terrestrial == 1) %>%
+              dplyr::pull(field_site_id)
+
             cat(jsonlite::toJSON(terrestrial_sites, auto_unbox=TRUE))
           ')
           echo "sites=$SITES" >> $GITHUB_OUTPUT
 
-
+  # -------------------------------------------------------
+  # Process each site in parallel
+  # -------------------------------------------------------
   process-site:
     needs: determine-sites
     runs-on: ubuntu-latest
@@ -65,14 +74,18 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-
       - uses: r-lib/actions/setup-r@v2
 
       - name: Install renv
         run: Rscript -e 'install.packages("renv", repos="https://cloud.r-project.org")'
 
+      - name: Install system dependencies for terra
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgdal-dev libproj-dev libgeos-dev
+
       - name: Restore R packages from renv.lock
-        run: Rscript -e 'renv::restore()'
+        run: Rscript -e 'renv::restore(prompt = FALSE)'
 
       - name: Determine month
         id: determine_month
@@ -98,21 +111,27 @@ jobs:
             data/drivers/neon/soil_drivers-*.csv
             data/targets/neon/forecast_prediction-*.csv
 
-
+  # -------------------------------------------------------
+  # Combine all site outputs
+  # -------------------------------------------------------
   reduce:
     needs: process-site
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v3
-
       - uses: r-lib/actions/setup-r@v2
 
       - name: Install renv
         run: Rscript -e 'install.packages("renv", repos="https://cloud.r-project.org")'
 
+      - name: Install system dependencies for terra
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgdal-dev libproj-dev libgeos-dev
+
       - name: Restore R packages from renv.lock
-        run: Rscript -e 'renv::restore()'
+        run: Rscript -e 'renv::restore(prompt = FALSE)'
 
       - name: Download all site artifacts
         uses: actions/download-artifact@v4
@@ -133,7 +152,7 @@ jobs:
           git commit -m "Parallel monthly update" || echo "No changes"
           git push origin $BRANCH || echo "No push"
 
-      - name: PR
+      - name: Create PR
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
