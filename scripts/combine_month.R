@@ -15,7 +15,7 @@ message("[combine_month] month=", curr_month)
 env_files <- list.files(path = "data/drivers/neon",
                         full.names = TRUE
 ) |>
-  stringr::str_subset(pattern = paste0("(?<=[:alpha:]{4}-)", curr_month, ".csv"))
+  stringr::str_subset(pattern = paste0("(?<=[A-Za-z0-9]{4}-)", curr_month, "\\.csv$"))
 
 if (length(env_files) > 0) {
   out_env <- tibble(
@@ -35,7 +35,8 @@ if (length(env_files) > 0) {
 flux_files <- list.files(path = "data/targets/neon", 
                          full.names = TRUE
 ) |>
-  str_subset(pattern = paste0("(?<=[:alpha:]{4}-)", curr_month, ".csv"))
+  stringr::str_subset(pattern = paste0("(?<=[A-Za-z0-9]{4}-)", curr_month, "\\.csv$"))
+
 
 if (length(flux_files) > 0) {
   out_flux <- tibble(
