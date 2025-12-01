@@ -19,7 +19,7 @@ jobs:
   determine-sites:
     runs-on: ubuntu-latest
     outputs:
-      sites: ${{ steps.get_sites.outputs.sites }}
+      sites_b64: ${{ steps.encode.outputs.sites_b64 }}
 
     steps:
       - uses: actions/checkout@v3
@@ -27,7 +27,6 @@ jobs:
       - uses: r-lib/actions/setup-r@v2
         with:
           r-version: "4.4.1"
-          use-public-rspm: true
 
       - name: Install system dependencies for terra
         run: |
@@ -43,32 +42,36 @@ jobs:
       - name: Get list of NEON site_ids
         id: get_sites
         run: |
-          SITES=$(Rscript --vanilla --quiet -e '
-            source("renv/activate.R")      # Ensure packages are visible
-            library(tidyverse)
+          SITES_JSON=$(Rscript --vanilla --quiet -e '
+            source("renv/activate.R")
             library(jsonlite)
             d <- readr::read_csv(
               "https://raw.githubusercontent.com/eco4cast/neon4cast-targets/main/NEON_Field_Site_Metadata_20220412.csv",
               show_col_types = FALSE
             )
-            terrestrial_sites <- d |> filter(terrestrial == 1) |> pull(field_site_id)
-            # Output JSON as single line
-            cat(jsonlite::toJSON(terrestrial_sites, auto_unbox=TRUE))
+            terrestrial_sites <- d[d$terrestrial == 1, "field_site_id"][[1]]
+            cat(toJSON(terrestrial_sites, auto_unbox=TRUE))
           ')
-          # Strip any newlines (just in case)
-          #SITES=$(echo $SITES | tr -d '\r\n')  # strip newlines
-          echo "sites=$SITES" >> $GITHUB_OUTPUT
+
+          # Encode JSON in Base64 (safe for GitHub Actions outputs)
+          SITES_B64=$(printf "%s" "$SITES_JSON" | base64 -w 0)
+
+          echo "sites_b64=$SITES_B64" >> $GITHUB_OUTPUT
+
+      - name: Debug Sites (optional)
+        run: |
+          echo "Base64: ${{ steps.get_sites.outputs.sites_b64 }}"
 
 
   process-site:
     needs: determine-sites
     runs-on: ubuntu-latest
+
     strategy:
       fail-fast: false
       matrix:
-        site: ${{ fromJson(needs.determine-sites.outputs.sites) }}
-    outputs:
-      site: ${{ matrix.site }}
+        # First decode Base64 → JSON string → usable array
+        site: ${{ fromJson( steps.decode.outputs.sites_json ) }}
 
     steps:
       - uses: actions/checkout@v3
@@ -76,7 +79,11 @@ jobs:
       - uses: r-lib/actions/setup-r@v2
         with:
           r-version: "4.4.1"
-          use-public-rspm: true
+
+      - name: Decode Base64 site list
+        id: decode
+        run: |
+          echo "sites_json=$(echo '${{ needs.determine-sites.outputs.sites_b64 }}' | base64 --decode)" >> $GITHUB_OUTPUT
 
       - name: Install system dependencies for terra
         run: |
@@ -124,7 +131,6 @@ jobs:
       - uses: r-lib/actions/setup-r@v2
         with:
           r-version: "4.4.1"
-          use-public-rspm: true
 
       - name: Install system dependencies for terra
         run: |
@@ -134,7 +140,7 @@ jobs:
       - name: Install renv
         run: Rscript -e 'install.packages("renv", repos="https://cloud.r-project.org")'
 
-      - name: Restore R packages from renv.lock
+      - name: Restore R packages
         run: Rscript -e 'renv::restore()'
 
       - name: Download all site artifacts
@@ -151,8 +157,10 @@ jobs:
 
           BRANCH=parallel-${{ github.event.inputs.month }}
           git checkout -B $BRANCH
+
           git add data/drivers/neon_soil_drivers-${{ github.event.inputs.month }}.csv
           git add data/targets/neon_targets-${{ github.event.inputs.month }}.csv
+
           git commit -m "Parallel monthly update" || echo "No changes"
           git push origin $BRANCH || echo "No push"
 
