@@ -26,31 +26,29 @@ jobs:
 
       - uses: r-lib/actions/setup-r@v2
 
-      # Restore renv packages
       - name: Install renv
         run: Rscript -e 'install.packages("renv", repos="https://cloud.r-project.org")'
 
-      - name: Restore R packages from renv.lock
+      - name: Restore packages from lockfile
         run: Rscript -e 'renv::restore()'
 
       - name: Get list of NEON site_ids
         id: get_sites
         run: |
           SITES=$(Rscript --vanilla --quiet -e '
-            source("renv/activate.R")
             library(tidyverse)
             library(jsonlite)
             d <- readr::read_csv(
               "https://raw.githubusercontent.com/eco4cast/neon4cast-targets/main/NEON_Field_Site_Metadata_20220412.csv",
               show_col_types = FALSE
             )
-            terrestrial_sites <- d |>
-              dplyr::filter(terrestrial == 1) |>
-              dplyr::pull(field_site_id)
+            terrestrial_sites <- d %>% filter(terrestrial == 1) %>% pull(field_site_id)
+            # Output JSON as single line
             cat(jsonlite::toJSON(terrestrial_sites, auto_unbox=TRUE))
           ')
-          # Encode as base64 to avoid invalid characters in GitHub output
-          echo "sites=$(echo $SITES | base64)" >> $GITHUB_OUTPUT
+          # Strip any newlines (just in case)
+          SITES=$(echo $SITES | tr -d '\n')
+          echo "sites=$SITES" >> $GITHUB_OUTPUT
 
   process-site:
     needs: determine-sites
@@ -58,7 +56,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        site: ${{ fromJson(fromBase64(needs.determine-sites.outputs.sites)) }}
+        site: ${{ fromJson(needs.determine-sites.outputs.sites) }}
     outputs:
       site: ${{ matrix.site }}
 
@@ -67,11 +65,7 @@ jobs:
 
       - uses: r-lib/actions/setup-r@v2
 
-      # Restore renv packages
-      - name: Install renv
-        run: Rscript -e 'install.packages("renv", repos="https://cloud.r-project.org")'
-
-      - name: Restore R packages from renv.lock
+      - name: Restore packages from lockfile
         run: Rscript -e 'renv::restore()'
 
       - name: Determine month
@@ -107,11 +101,7 @@ jobs:
 
       - uses: r-lib/actions/setup-r@v2
 
-      # Restore renv packages
-      - name: Install renv
-        run: Rscript -e 'install.packages("renv", repos="https://cloud.r-project.org")'
-
-      - name: Restore R packages from renv.lock
+      - name: Restore packages from lockfile
         run: Rscript -e 'renv::restore()'
 
       - name: Download all site artifacts
