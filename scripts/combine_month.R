@@ -12,9 +12,10 @@ suppressPackageStartupMessages({
 message("[combine_month] month=", curr_month)
 
 # Env files
-env_dir <- file.path("data", "drivers", "neon")
-env_pattern <- paste0("soil_drivers-[:alnum:]{4}-", curr_month, "\\.csv")
-env_files <- list.files(path = env_dir, full.names = TRUE, pattern = env_pattern)
+env_files <- list.files(path = "data/drivers/neon",
+                        full.names = TRUE
+) |>
+  stringr::str_subset(pattern = paste0("(?<=[:alpha:]{4}-)", curr_month, ".csv"))
 
 if (length(env_files) > 0) {
   out_env <- tibble(
@@ -31,9 +32,10 @@ if (length(env_files) > 0) {
 }
 
 # Flux files
-flux_dir <- file.path("data", "targets", "neon")
-flux_pattern <- paste0("forecast_prediction-[:alnum:]{4}-", curr_month, "\\.csv")
-flux_files <- list.files(path = flux_dir, full.names = TRUE, pattern = flux_pattern)
+flux_files <- list.files(path = "data/targets/neon", 
+                         full.names = TRUE
+) |>
+  str_subset(pattern = paste0("(?<=[:alpha:]{4}-)", curr_month, ".csv"))
 
 if (length(flux_files) > 0) {
   out_flux <- tibble(
