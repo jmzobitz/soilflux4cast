@@ -33,15 +33,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libgdal-dev libproj-dev libgeos-dev
 
-      - name: Restore only needed R packages
-        run: |
-          Rscript -e '
-            install.packages("renv", repos="https://cloud.r-project.org")
-            source("renv/activate.R")
-            renv::restore(
-              packages = c("tidyverse", "jsonlite"),
-              prompt = FALSE
-            )
+      - name: Restore R packages from renv.lock
+        run: Rscript -e 'renv::restore(prompt = FALSE)'
           '
 
       - name: Get list of NEON site_ids
