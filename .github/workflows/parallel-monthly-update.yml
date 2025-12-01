@@ -26,23 +26,28 @@ jobs:
 
       - uses: r-lib/actions/setup-r@v2
 
+      - name: Install system dependencies for terra
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgdal-dev libproj-dev libgeos-dev
+
       - name: Install renv
         run: Rscript -e 'install.packages("renv", repos="https://cloud.r-project.org")'
 
       - name: Restore R packages from renv.lock
-        run: Rscript -e 'renv::restore(packages = c("tidyverse", "jsonlite","neonSoilFlux","neonUtilities"))'
-          
+        run: Rscript -e 'renv::restore()'
+
       - name: Get list of NEON site_ids
         id: get_sites
         run: |
           SITES=$(Rscript --vanilla --quiet -e '
             library(tidyverse)
             library(jsonlite)
-            d <- read_csv(
+            d <- readr::read_csv(
               "https://raw.githubusercontent.com/eco4cast/neon4cast-targets/main/NEON_Field_Site_Metadata_20220412.csv",
               show_col_types = FALSE
             )
-            terrestrial_sites <- d |> filter(terrestrial == 1) |> pull(field_site_id)
+            terrestrial_sites <- d |> dplyr::filter(terrestrial == 1) |> dplyr::pull(field_site_id)
             cat(jsonlite::toJSON(terrestrial_sites, auto_unbox=TRUE))
           ')
           echo "sites=$SITES" >> $GITHUB_OUTPUT
@@ -63,9 +68,11 @@ jobs:
 
       - uses: r-lib/actions/setup-r@v2
 
-      - name: Install dependencies
-        run: |
-          Rscript -e 'install.packages(c("neonUtilities","neonSoilFlux","tidyverse"))'
+      - name: Install renv
+        run: Rscript -e 'install.packages("renv", repos="https://cloud.r-project.org")'
+
+      - name: Restore R packages from renv.lock
+        run: Rscript -e 'renv::restore()'
 
       - name: Determine month
         id: determine_month
@@ -91,6 +98,7 @@ jobs:
             data/drivers/neon/soil_drivers-*.csv
             data/targets/neon/forecast_prediction-*.csv
 
+
   reduce:
     needs: process-site
     runs-on: ubuntu-latest
@@ -100,8 +108,11 @@ jobs:
 
       - uses: r-lib/actions/setup-r@v2
 
-      - name: Install tidyverse
-        run: Rscript -e 'install.packages("tidyverse")'
+      - name: Install renv
+        run: Rscript -e 'install.packages("renv", repos="https://cloud.r-project.org")'
+
+      - name: Restore R packages from renv.lock
+        run: Rscript -e 'renv::restore()'
 
       - name: Download all site artifacts
         uses: actions/download-artifact@v4
