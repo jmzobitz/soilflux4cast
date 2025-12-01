@@ -30,7 +30,7 @@ jobs:
         run: Rscript -e 'install.packages("renv", repos="https://cloud.r-project.org")'
 
       - name: Restore R packages from renv.lock
-        run: Rscript -e 'renv::restore()'
+        run: Rscript -e 'renv::restore(packages = c("tidyverse", "jsonlite","neonSoilFlux","neonUtilities"))'
           
       - name: Get list of NEON site_ids
         id: get_sites
