@@ -1,0 +1,27 @@
+name: Acquire Full NEON Month
+
+on:
+  workflow_dispatch:
+    inputs:
+      month:
+        description: "Month to process (YYYY-MM)"
+        required: true
+        type: string
+
+jobs:
+  env:
+    uses: ./.github/workflows/acquire-env.yml
+    with:
+      month: ${{ github.event.inputs.month }}
+
+  flux:
+    uses: ./.github/workflows/acquire-flux.yml
+    needs: env
+    with:
+      month: ${{ github.event.inputs.month }}
+
+  combine:
+    uses: ./.github/workflows/glob-and-clean.yml
+    needs: flux
+    with:
+      month: ${{ github.event.inputs.month }}

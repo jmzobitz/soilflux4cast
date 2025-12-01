@@ -1,0 +1,125 @@
+name: NEON Monthly Update (Parallel)
+
+on:
+  workflow_dispatch:
+    inputs:
+      month:
+        description: "Month to process (YYYY-MM)"
+        required: true
+        default: "2025-01"
+
+  schedule:
+    - cron: "0 10 15 * *"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  determine-sites:
+    runs-on: ubuntu-latest
+    outputs:
+      sites: ${{ steps.get_sites.outputs.sites }}
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: r-lib/actions/setup-r@v2
+
+      - name: Install tidyverse
+        run: Rscript -e 'install.packages("tidyverse")'
+
+      - name: Get list of NEON site_ids
+        id: get_sites
+        run: |
+          SITES=$(Rscript -e '
+            library(tidyverse)
+            d <- read_csv("https://raw.githubusercontent.com/eco4cast/neon4cast-targets/main/NEON_Field_Site_Metadata_20220412.csv", show_col_types=FALSE)
+            d <- d |> filter(terrestrial == 1) |> pull(field_site_id)
+            cat(jsonlite::toJSON(d))
+          ')
+          echo "sites=$SITES" >> $GITHUB_OUTPUT
+
+  process-site:
+    needs: determine-sites
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        site: ${{ fromJson(needs.determine-sites.outputs.sites) }}
+    outputs:
+      site: ${{ matrix.site }}
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: r-lib/actions/setup-r@v2
+
+      - name: Install dependencies
+        run: |
+          Rscript -e 'install.packages(c("neonUtilities","neonSoilFlux","tidyverse"))'
+
+      - name: Determine month
+        id: determine_month
+        run: |
+          if [ -n "${{ github.event.inputs.month }}" ]; then
+            echo "month=${{ github.event.inputs.month }}" >> $GITHUB_OUTPUT
+          else
+            MONTH=$(date -d "$(date +%Y-%m-01) -1 month" +%Y-%m)
+            echo "month=$MONTH" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run single-site processing
+        run: |
+          Rscript scripts/process_single_site.R \
+            "${{ matrix.site }}" \
+            "${{ steps.determine_month.outputs.month }}"
+
+      - name: Upload site artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: site-${{ matrix.site }}
+          path: |
+            data/drivers/neon/soil_drivers-*.csv
+            data/targets/neon/forecast_prediction-*.csv
+
+  reduce:
+    needs: process-site
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: r-lib/actions/setup-r@v2
+
+      - name: Install tidyverse
+        run: Rscript -e 'install.packages("tidyverse")'
+
+      - name: Download all site artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Combine outputs
+        run: |
+          Rscript scripts/combine_month.R "${{ github.event.inputs.month }}"
+
+      - name: Commit & PR
+        run: |
+          git config --global user.email "zobitz@augsburg.edu"
+          git config --global user.name "jmzobitz"
+
+          BRANCH=parallel-${{ github.event.inputs.month }}
+          git checkout -B $BRANCH
+          git add data/drivers/neon_soil_drivers-${{ github.event.inputs.month }}.csv
+          git add data/targets/neon_targets-${{ github.event.inputs.month }}.csv
+          git commit -m "Parallel monthly update" || echo "No changes"
+          git push origin $BRANCH || echo "No push"
+
+      - name: PR
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+        run: |
+          gh pr create \
+            --base main \
+            --head parallel-${{ github.event.inputs.month }} \
+            --title "Parallel update for ${{ github.event.inputs.month }}" \
+            --body "Automated parallel update."

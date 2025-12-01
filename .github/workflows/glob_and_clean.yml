@@ -1,0 +1,27 @@
+name: Combine NEON Outputs
+
+on:
+  workflow_dispatch:
+    inputs:
+      month:
+        description: "Month to glob (YYYY-MM)"
+        required: true
+        type: string
+
+jobs:
+  combine:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up R
+        uses: r-lib/actions/setup-r@v2
+
+      - name: Install R package dependencies
+        uses: r-lib/actions/setup-r-dependencies@v2
+
+      - name: Run globs + cleanup
+        run: |
+          Rscript scripts/glob_and_cleanup.R "${{ github.event.inputs.month }}"
