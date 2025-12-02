@@ -155,6 +155,10 @@ jobs:
 
       - name: Download all site artifacts
         uses: actions/download-artifact@v4
+        with:
+          pattern: site-*
+          path: .
+          merge-multiple: true
 
       - name: Combine outputs
         run: |
