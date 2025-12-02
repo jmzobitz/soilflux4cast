@@ -25,8 +25,6 @@ jobs:
       - uses: actions/checkout@v3
 
       - uses: r-lib/actions/setup-r@v2
-        #with:
-        #  r-version: "4.4.1"
 
       - name: Install system dependencies for terra
         run: |
@@ -54,8 +52,6 @@ jobs:
             # Output JSON as single line
             cat(jsonlite::toJSON(terrestrial_sites, auto_unbox=TRUE))
           ')
-          # Strip any newlines (just in case)
-          #SITES=$(echo $SITES | tr -d '\r\n')  # strip newlines
           echo "sites=$SITES" >> $GITHUB_OUTPUT
 
 
@@ -73,8 +69,6 @@ jobs:
       - uses: actions/checkout@v3
 
       - uses: r-lib/actions/setup-r@v2
-        #with:
-        #  r-version: "4.4.1"
 
       - name: Install system dependencies for terra
         run: |
@@ -132,8 +126,6 @@ jobs:
       - uses: actions/checkout@v3
 
       - uses: r-lib/actions/setup-r@v2
-        #with:
-        #  r-version: "4.4.1"
 
       - name: Install system dependencies for terra
         run: |
@@ -155,6 +147,25 @@ jobs:
 
       - name: Download all site artifacts
         uses: actions/download-artifact@v4
+        with:
+          pattern: site-*
+          path: .
+          merge-multiple: true
+
+      - name: Merge downloaded artifacts into workspace
+        run: |
+          for d in site-*; do
+            if [ -d "$d/data/drivers/neon" ]; then
+              mkdir -p data/drivers/neon
+              cp -v "$d"/data/drivers/neon/* data/drivers/neon/ || true
+            fi
+            if [ -d "$d/data/targets/neon" ]; then
+              mkdir -p data/targets/neon
+              cp -v "$d"/data/targets/neon/* data/targets/neon/ || true
+            fi
+          done
+          echo "Workspace data/ contents after copying artifacts:"
+          ls -R data || true
 
       - name: Combine outputs
         run: |
@@ -167,9 +178,23 @@ jobs:
 
           BRANCH=parallel-${{ github.event.inputs.month }}
           git checkout -B $BRANCH
-          git add data/drivers/neon_soil_drivers-${{ github.event.inputs.month }}.csv
-          git add data/targets/neon_targets-${{ github.event.inputs.month }}.csv
-          git commit -m "Parallel monthly update" || echo "No changes"
+
+          FILE1="data/drivers/neon_soil_drivers-${{ github.event.inputs.month }}.csv"
+          FILE2="data/targets/neon_targets-${{ github.event.inputs.month }}.csv"
+
+          if [ -f "$FILE1" ]; then
+            git add "$FILE1"
+          else
+            echo "No drivers file to add: $FILE1"
+          fi
+
+          if [ -f "$FILE2" ]; then
+            git add "$FILE2"
+          else
+            echo "No targets file to add: $FILE2"
+          fi
+
+          git commit -m "Parallel monthly update" || echo "No changes to commit"
           git push origin $BRANCH || echo "No push"
 
       - name: PR
