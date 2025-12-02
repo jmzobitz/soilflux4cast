@@ -40,42 +40,28 @@ jobs:
           git config --global user.name "jmzobitz"
           git config --global user.email "zobitz@augsburg.edu"
 
-      - name: Set branch name
-        run: echo "BRANCH=daily-forecast-update-${{ env.FORECAST_DATE }}" >> $GITHUB_ENV
-
-
-      - name: Commit forecast update to branch
-        run: |
-          git checkout -B $BRANCH
-          git add "$OUTPUT_FILE" || echo "No file to add"
-          git commit -m "Add forecast output for $FORECAST_DATE" || echo "No changes to commit"
-          git remote set-url origin https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git
-          git push origin $BRANCH --force || echo "Push failed or nothing to push"
-
-      - name: Create and merge pull request
+      # NEW: Commit directly to main instead of PR
+      - name: Commit forecast update directly to main
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
-          # Check if branch has commits ahead of main
-          if [ "$(git rev-list origin/main..$BRANCH --count)" -eq 0 ]; then
-            echo "No new commits between main and $BRANCH — skipping PR creation."
-            exit 0
-          fi
-          
-          # Only create PR if it doesn't already exist
-          if gh pr view $BRANCH --json number > /dev/null 2>&1; then
-            echo "PR already exists for $BRANCH"
+          git checkout main
+          git pull origin main
+
+          FILE="$OUTPUT_FILE"
+
+          # Force-add file even if in .gitignore
+          if [ -f "$FILE" ]; then
+            git add -f "$FILE"
           else
-            gh pr create \
-              --base main \
-              --head $BRANCH \
-              --title "Auto PR: Forecast update $FORECAST_DATE" \
-              --body "Automated forecast update."
+            echo "Output file not found: $FILE"
           fi
 
-          # Merge and auto-delete branch if PR exists
-          if gh pr view $BRANCH --json number > /dev/null 2>&1; then
-            gh pr merge --squash --admin --delete-branch || echo "Merge failed"
+          # Commit only if there are actual changes
+          if [ -n "$(git status --porcelain)" ]; then
+            git commit -m "Daily forecast update for $FORECAST_DATE"
+            git remote set-url origin https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git
+            git push origin main
           else
-            echo "No PR to merge"
+            echo "No changes to commit."
           fi
