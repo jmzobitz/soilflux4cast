@@ -45,7 +45,7 @@ vignettes/*.pdf
 .Renviron
 
 # data files
-/data/
+# /data/
 
 # process files
 /process/
