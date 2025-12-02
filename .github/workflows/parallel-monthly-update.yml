@@ -156,6 +156,21 @@ jobs:
       - name: Download all site artifacts
         uses: actions/download-artifact@v4
 
+      - name: Merge downloaded artifacts into workspace
+        run: |
+          for d in site-*; do
+            if [ -d "$d/data/drivers/neon" ]; then
+              mkdir -p data/drivers/neon
+              cp -v "$d"/data/drivers/neon/* data/drivers/neon/ || true
+            fi
+            if [ -d "$d/data/targets/neon" ]; then
+              mkdir -p data/targets/neon
+              cp -v "$d"/data/targets/neon/* data/targets/neon/ || true
+            fi
+          done
+          echo "Workspace data/ contents after copying artifacts:"
+          ls -R data || true
+
       - name: Combine outputs
         run: |
           Rscript scripts/combine_month.R "${{ github.event.inputs.month }}"
@@ -167,9 +182,23 @@ jobs:
 
           BRANCH=parallel-${{ github.event.inputs.month }}
           git checkout -B $BRANCH
-          git add data/drivers/neon_soil_drivers-${{ github.event.inputs.month }}.csv
-          git add data/targets/neon_targets-${{ github.event.inputs.month }}.csv
-          git commit -m "Parallel monthly update" || echo "No changes"
+
+          FILE1="data/drivers/neon_soil_drivers-${{ github.event.inputs.month }}.csv"
+          FILE2="data/targets/neon_targets-${{ github.event.inputs.month }}.csv"
+
+          if [ -f "$FILE1" ]; then
+            git add "$FILE1"
+          else
+            echo "No drivers file to add: $FILE1"
+          fi
+
+          if [ -f "$FILE2" ]; then
+            git add "$FILE2"
+          else
+            echo "No targets file to add: $FILE2"
+          fi
+
+          git commit -m "Parallel monthly update" || echo "No changes to commit"
           git push origin $BRANCH || echo "No push"
 
       - name: PR
