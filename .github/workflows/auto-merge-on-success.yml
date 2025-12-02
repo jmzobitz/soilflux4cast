@@ -3,6 +3,7 @@ on:
   workflow_run:
     workflows: ["NEON Monthly Update (Parallel)"]
     types: ["completed"]
+  workflow_dispatch:     # Allow manual trigger
 
 jobs:
   auto-merge:
