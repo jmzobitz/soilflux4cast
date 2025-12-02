@@ -11,11 +11,12 @@ suppressPackageStartupMessages({
 
 message("[combine_month] month=", curr_month)
 
-# Env files
-env_files <- list.files(path = "data/drivers/neon",
+# Env files - search recursively from repo root for per-site CSVs matching the month
+env_files <- list.files(path = ".",
+                        pattern = paste0("soil_drivers-[A-Za-z0-9]{4}-", curr_month, "\\.csv$"),
+                        recursive = TRUE,
                         full.names = TRUE
-) |>
-  stringr::str_subset(pattern = paste0("(?<=[A-Za-z0-9]{4}-)", curr_month, "\\.csv$"))
+)
 
 if (length(env_files) > 0) {
   out_env <- tibble(
@@ -31,11 +32,12 @@ if (length(env_files) > 0) {
   message("[combine_month] no env files found")
 }
 
-# Flux files
-flux_files <- list.files(path = "data/targets/neon", 
+# Flux files - search recursively from repo root for per-site CSVs matching the month
+flux_files <- list.files(path = ".",
+                         pattern = paste0("forecast_prediction-[A-Za-z0-9]{4}-", curr_month, "\\.csv$"),
+                         recursive = TRUE,
                          full.names = TRUE
-) |>
-  stringr::str_subset(pattern = paste0("(?<=[A-Za-z0-9]{4}-)", curr_month, "\\.csv$"))
+)
 
 
 if (length(flux_files) > 0) {
