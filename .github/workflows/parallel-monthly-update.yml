@@ -156,6 +156,21 @@ jobs:
       - name: Download all site artifacts
         uses: actions/download-artifact@v4
 
+      - name: Merge downloaded artifacts into workspace
+        run: |
+          for d in site-*; do
+            if [ -d "$d/data/drivers/neon" ]; then
+              mkdir -p data/drivers/neon
+              cp -v "$d"/data/drivers/neon/* data/drivers/neon/ || true
+            fi
+            if [ -d "$d/data/targets/neon" ]; then
+              mkdir -p data/targets/neon
+              cp -v "$d"/data/targets/neon/* data/targets/neon/ || true
+            fi
+          done
+          echo "Workspace data/ contents after copying artifacts:"
+          ls -R data || true
+
       - name: Combine outputs
         run: |
           Rscript scripts/combine_month.R "${{ github.event.inputs.month }}"
@@ -167,10 +182,28 @@ jobs:
 
           BRANCH=parallel-${{ github.event.inputs.month }}
           git checkout -B $BRANCH
-          git add data/drivers/neon_soil_drivers-${{ github.event.inputs.month }}.csv
-          git add data/targets/neon_targets-${{ github.event.inputs.month }}.csv
-          git commit -m "Parallel monthly update" || echo "No changes"
-          git push origin $BRANCH || echo "No push"
+
+          ENV_FILE="data/drivers/neon_soil_drivers-${{ github.event.inputs.month }}.csv"
+          TARGET_FILE="data/targets/neon_targets-${{ github.event.inputs.month }}.csv"
+
+          if [ -f "$ENV_FILE" ]; then
+            git add "$ENV_FILE"
+          else
+            echo "ENV_FILE not found: $ENV_FILE"
+          fi
+
+          if [ -f "$TARGET_FILE" ]; then
+            git add "$TARGET_FILE"
+          else
+            echo "TARGET_FILE not found: $TARGET_FILE"
+          fi
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Parallel monthly update"
+            git push origin $BRANCH || echo "No push"
+          fi
 
       - name: PR
         env:
