@@ -172,6 +172,8 @@ jobs:
           Rscript scripts/combine_month.R "${{ github.event.inputs.month }}"
 
       - name: Commit & PR
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
           git config --global user.email "zobitz@augsburg.edu"
           git config --global user.name "jmzobitz"
@@ -182,27 +184,30 @@ jobs:
           FILE1="data/drivers/neon_soil_drivers-${{ github.event.inputs.month }}.csv"
           FILE2="data/targets/neon_targets-${{ github.event.inputs.month }}.csv"
 
+          staged=false
+
           if [ -f "$FILE1" ]; then
-            git add "$FILE1"
+            # force-add in case data/ is ignored
+            git add -f "$FILE1" && staged=true || true
           else
             echo "No drivers file to add: $FILE1"
           fi
 
           if [ -f "$FILE2" ]; then
-            git add "$FILE2"
+            git add -f "$FILE2" && staged=true || true
           else
             echo "No targets file to add: $FILE2"
           fi
 
-          git commit -m "Parallel monthly update" || echo "No changes to commit"
-          git push origin $BRANCH || echo "No push"
-
-      - name: PR
-        env:
-          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
-        run: |
-          gh pr create \
-            --base main \
-            --head parallel-${{ github.event.inputs.month }} \
-            --title "Parallel update for ${{ github.event.inputs.month }}" \
-            --body "Automated parallel update."
+          # If any files were staged, commit/push/create PR; otherwise skip gracefully
+          if [ "$staged" = true ] || [ -n "$(git status --porcelain)" ]; then
+            git commit -m "Parallel monthly update" || echo "No changes to commit"
+            git push origin $BRANCH || echo "No push"
+            gh pr create \
+              --base main \
+              --head $BRANCH \
+              --title "Parallel update for ${{ github.event.inputs.month }}" \
+              --body "Automated parallel update."
+          else
+            echo "No combined CSVs to commit; skipping push and PR."
+          fi
