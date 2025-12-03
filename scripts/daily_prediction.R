@@ -8,7 +8,7 @@ library(purrr)
 args <- commandArgs(trailingOnly = TRUE)
 forecast_date <- args[1]  
 
-
+year_before <- as.character(as.numeric(substr(forecast_date,1,4))-1)
 
 # Acquire the NEON site_data 
 site_data <- readr::read_csv(paste0("https://raw.githubusercontent.com/eco4cast/neon4cast-targets/","main/NEON_Field_Site_Metadata_20220412.csv"),show_col_types = FALSE) |> 
@@ -46,7 +46,7 @@ stage1 <-
 env_vars <- c("PRES","TSOIL", "SOILW", "WEASD", "SNOD","ICETK")
 
 # Grab the data we need
-forecast_data <- stage1 |> 
+driver_data <- stage1 |> 
   filter(variable %in% env_vars,
          site_id %in% site_data$field_site_id) |> 
   collect() |>
@@ -55,7 +55,7 @@ forecast_data <- stage1 |>
 
 
 # Compute forecast
-input_forecast_null <- forecast_data |>
+input_forecast_null <- driver_data |>
   mutate(model = 'null',
          value = null_model(TSOIL)) |>
   select(-all_of(env_vars))
@@ -92,7 +92,7 @@ fit_vals <- joined_vars |>
 
 
 # Compute forecast
-input_forecast_lm <- forecast_data |>
+input_forecast_lm <- driver_data |>
   inner_join(fit_vals,by="site_id") |>
   mutate(model = 'lm',
          value = pmap_dbl(.l=list(lm_fit,TSOIL,SOILW),.f=~predict(..1,tibble(TSOIL=..2-273.15,SOILW=..3)) ) ) |>
@@ -100,10 +100,59 @@ input_forecast_lm <- forecast_data |>
 
 ####
 
+
+### Model 3: 
+
+source("R/download_annual_values.R")
+source("R/fit_exp_soilR.R")
+
+
+drivers <- download_annual_values("drivers",year_before)
+targets <- download_annual_values("targets",year_before)
+
+# now join by site and day
+
+joined_data <- drivers |>
+  inner_join(targets,by=c("site_id","startDateTime")) |>
+  group_by(site_id) |>
+  nest() |>
+  mutate(fit_coeff = map(data,fit_exp_soilR)) |>
+  select(-data)
+
+calc_soilR <- function(params,data) {
+  
+  TSOIL <- data$TSOIL
+  kR <- params |> filter(term == "kR") |> pull(value)
+  Q10 <- params |> filter(term == "Q10") |> pull(value)
+  
+  data <- data |>
+    mutate(value = kR*Q10^((TSOIL-10))/10)
+  
+  return(data)
+  
+}
+
+input_forecast_exp <- driver_data |>
+  mutate(TSOIL = TSOIL-273.15) |>
+  group_by(site_id) |>
+  nest() |>
+  inner_join(joined_data,by="site_id") |>
+  mutate(fit_value = map2(.x=fit_coeff,.y=data,.f=~calc_soilR(.x,.y))) |>
+  select(site_id,fit_value) |>
+  unnest(cols=c(fit_value)) |>
+  mutate(model = 'exp') |>
+  select(-all_of(env_vars))
+  
+
+# next if we have forecast drivers we compute them
+
+
+
+
 forecast_file <- paste0('data/outputs/forecast_prediction-',forecast_date,'.csv')
 
 # glob forecasts together
-input_forecast <- rbind(input_forecast_null,input_forecast_lm)
+input_forecast <- rbind(input_forecast_null,input_forecast_lm,input_forecast_exp)
 
 # Write updated data back to CSV
 write_csv(input_forecast, file = forecast_file)
