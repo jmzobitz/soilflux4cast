@@ -20,7 +20,7 @@ on:
 jobs:
 
   # ---------------------------------------------------------
-  # 1. Decide whether we are running via cron or dispatch
+  # 1. Decide if running by cron or manual dispatch
   # ---------------------------------------------------------
   determine-dates:
     runs-on: ubuntu-latest
@@ -28,30 +28,32 @@ jobs:
       mode: ${{ steps.pick-mode.outputs.mode }}
       date_list: ${{ steps.pick-mode.outputs.date_list }}
     steps:
-      - id: pick-mode
+      - name: Determine execution mode (cron vs dispatch)
+        id: pick-mode
         run: |
-          # If workflow_dispatch inputs exist, use matrix mode
+          # If both inputs exist, we are running in "matrix" mode
           if [ -n "${{ github.event.inputs.start_date }}" ] && [ -n "${{ github.event.inputs.end_date }}" ]; then
             echo "mode=matrix" >> $GITHUB_OUTPUT
 
             start="${{ github.event.inputs.start_date }}"
             end="${{ github.event.inputs.end_date }}"
 
-            dates=$(seq -f "%02g" 0 $(( ( $(date -d "$end" +%s) - $(date -d "$start" +%s) ) / 86400 )) | \
-                   xargs -I{} date -d "$start + {} days" +%F | \
-                   jq -R . | jq -s .)
+            # Create compact JSON list of dates
+            dates=$(seq -f "%02g" 0 $(( ( $(date -d "$end" +%s) - $(date -d "$start" +%s) ) / 86400 )) \
+                    | xargs -I{} date -d "$start + {} days" +%F \
+                    | jq -R . | jq -s -c .)
 
-            echo "date_list=$dates" >> $GITHUB_OUTPUT
+            echo "date_list=$dates" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          # Otherwise we are in cron mode
+          # Otherwise this is a cron run → use yesterday only
           echo "mode=single" >> $GITHUB_OUTPUT
           yest=$(date -d "yesterday" +%F)
-          echo "date_list=[\"$yest\"]" >> $GITHUB_OUTPUT
+          echo "date_list=[\"$yest\"]" >> "$GITHUB_OUTPUT"
 
   # ---------------------------------------------------------
-  # 2. Forecast job (single or matrix)
+  # 2. Forecast update job (single or parallel matrix)
   # ---------------------------------------------------------
   update-forecast:
     needs: determine-dates
@@ -73,7 +75,11 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libcurl4-openssl-dev
         
       - name: Install needed R packages
-        run: Rscript -e 'install.packages(c("curl","readr","dplyr","tidyr","stringr","glue","arrow","httr","purrr","jsonlite","broom"), repos = "https://cloud.r-project.org")'
+        run: |
+          Rscript -e 'install.packages(c(
+            "curl","readr","dplyr","tidyr","stringr","glue",
+            "arrow","httr","purrr","jsonlite","broom"
+          ), repos = "https://cloud.r-project.org")'
 
       - name: Run prediction script
         run: Rscript scripts/daily_prediction.R "${{ matrix.forecast_date }}"
@@ -99,11 +105,11 @@ jobs:
           if [ -n "$(git status --porcelain)" ]; then
             git commit -m "Forecast update for ${{ matrix.forecast_date }}"
             git remote set-url origin https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git
-            
-            # Safe push with retry to avoid race conditions
+
+            # Safe push with retry loop
             for i in {1..5}; do
               git pull --rebase origin main && git push origin main && break
-              echo "Retry push..."
+              echo "Push failed, retrying..."
               sleep 5
             done
           else
