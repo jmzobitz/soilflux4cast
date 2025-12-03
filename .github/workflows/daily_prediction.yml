@@ -5,12 +5,62 @@ permissions:
 
 on:
   schedule:
-    - cron: '0 10 * * *'  # Run at 10 UTC
-  workflow_dispatch:     # Allow manual trigger
+    - cron: '0 10 * * *'
+  workflow_dispatch:
+    inputs:
+      start_date:
+        description: "Starting date (YYYY-MM-DD)"
+        required: false
+        type: string
+      end_date:
+        description: "Ending date (YYYY-MM-DD)"
+        required: false
+        type: string
 
 jobs:
-  update-forecast:
+
+  # ---------------------------------------------------------
+  # 1. Decide whether we are running via cron or dispatch
+  # ---------------------------------------------------------
+  determine-dates:
     runs-on: ubuntu-latest
+    outputs:
+      mode: ${{ steps.pick-mode.outputs.mode }}
+      date_list: ${{ steps.pick-mode.outputs.date_list }}
+    steps:
+      - id: pick-mode
+        run: |
+          # If workflow_dispatch inputs exist, use matrix mode
+          if [ -n "${{ github.event.inputs.start_date }}" ] && [ -n "${{ github.event.inputs.end_date }}" ]; then
+            echo "mode=matrix" >> $GITHUB_OUTPUT
+
+            start="${{ github.event.inputs.start_date }}"
+            end="${{ github.event.inputs.end_date }}"
+
+            dates=$(seq -f "%02g" 0 $(( ( $(date -d "$end" +%s) - $(date -d "$start" +%s) ) / 86400 )) | \
+                   xargs -I{} date -d "$start + {} days" +%F | \
+                   jq -R . | jq -s .)
+
+            echo "date_list=$dates" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Otherwise we are in cron mode
+          echo "mode=single" >> $GITHUB_OUTPUT
+          yest=$(date -d "yesterday" +%F)
+          echo "date_list=[\"$yest\"]" >> $GITHUB_OUTPUT
+
+  # ---------------------------------------------------------
+  # 2. Forecast job (single or matrix)
+  # ---------------------------------------------------------
+  update-forecast:
+    needs: determine-dates
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        forecast_date: ${{ fromJson(needs.determine-dates.outputs.date_list) }}
 
     steps:
       - name: Checkout repo
@@ -25,43 +75,37 @@ jobs:
       - name: Install needed R packages
         run: Rscript -e 'install.packages(c("curl","readr","dplyr","tidyr","stringr","glue","arrow","httr","purrr","jsonlite","broom"), repos = "https://cloud.r-project.org")'
 
-          
-      - name: Set forecast date and output file
-        run: |
-          FORECAST_DATE=$(date -d "yesterday" +%F)
-          echo "FORECAST_DATE=$FORECAST_DATE" >> $GITHUB_ENV
-          echo "OUTPUT_FILE=data/outputs/forecast_prediction-$FORECAST_DATE.csv" >> $GITHUB_ENV
+      - name: Run prediction script
+        run: Rscript scripts/daily_prediction.R "${{ matrix.forecast_date }}"
 
-      - name: Run daily forecast script
-        run: Rscript scripts/daily_prediction.R "$FORECAST_DATE"
-
-      - name: Configure Git with your user info
+      - name: Configure Git
         run: |
           git config --global user.name "jmzobitz"
           git config --global user.email "zobitz@augsburg.edu"
 
-      # NEW: Commit directly to main instead of PR
-      - name: Commit forecast update directly to main
+      - name: Commit forecast update
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
-          git checkout main
-          git pull origin main
+          FILE="data/outputs/forecast_prediction-${{ matrix.forecast_date }}.csv"
 
-          FILE="$OUTPUT_FILE"
-
-          # Force-add file even if in .gitignore
-          if [ -f "$FILE" ]; then
-            git add -f "$FILE"
-          else
-            echo "Output file not found: $FILE"
+          if [ ! -f "$FILE" ]; then
+            echo "No output for ${{ matrix.forecast_date }}"
+            exit 0
           fi
 
-          # Commit only if there are actual changes
+          git add -f "$FILE"
+
           if [ -n "$(git status --porcelain)" ]; then
-            git commit -m "Daily forecast update for $FORECAST_DATE"
+            git commit -m "Forecast update for ${{ matrix.forecast_date }}"
             git remote set-url origin https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git
-            git push origin main
+            
+            # Safe push with retry to avoid race conditions
+            for i in {1..5}; do
+              git pull --rebase origin main && git push origin main && break
+              echo "Retry push..."
+              sleep 5
+            done
           else
-            echo "No changes to commit."
+            echo "No changes to commit"
           fi
