@@ -1,4 +1,4 @@
-#' acquire_forecast Acquire the noon forecast cycle across all NEON sites at a given date.
+#' acquire_drivers Acquire the forecast cycle across all NEON sites at a given date.
 #'
 #' @param date specific day of the year in YYYY-MM-DD
 #' @param forecast_vals the type of forecast. Can be c("gec00",sprintf("gep%02d", 1:30))
@@ -11,8 +11,8 @@
 #' @export
 #'
 #' @examples
-#' acquire_forecast("2024-01-01")
-acquire_forecast <- function(date,
+#' acquire_drivers("2024-01-01")
+acquire_drivers <- function(date,
                              cycle = "00",
                              forecast_vals = c("gec00",sprintf("gep%02d", 1:30)),
                              forecast_horizon = c("f000", sprintf("f%03d", seq(24, 384, by = 24))),

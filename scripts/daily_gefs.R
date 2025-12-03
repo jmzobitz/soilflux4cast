@@ -6,7 +6,7 @@ library(lubridate)
 
 
 # Source the forecast function (make sure the path is correct)
-source("R/acquire_forecast.R")
+source("R/acquire_drivers.R")
 
 # Get the previous day's date in YYYY-MM-DD format
 input_date <- as.character(Sys.Date() - 1)
@@ -29,7 +29,7 @@ if (file.exists(observed_file)) {
 }
 
 # Acquire forecast data for the previous day across all horizons
-input_drivers <- acquire_forecast(input_date) |>
+input_drivers <- acquire_drivers(input_date) |>
 mutate(date = input_date) |>
 pivot_wider() |>
 relocate(date, field_site_id) |>
