@@ -8,20 +8,44 @@ library(xgboost)
 library(lubridate)
 library(tidyverse)
 
+### Source some functions
+source("R/download_annual_values.R")
+source("R/fit_exp_soilR.R")
+source('R/drivers_available.R')
+source('R/targets_available.R')
+
+
 args <- commandArgs(trailingOnly = TRUE)
 forecast_date <- args[1]  
 
-# month_before <- sprintf("%02d",as.numeric(substr(forecast_date,6,7))-1)
-# year_ref <- substr(forecast_date,1,4)
-# 
-# # Adjust if the month is 00 - we need to look one more back
-# if (month_before == "00") {
-#   month_before <- "12"
-#   year_ref <- as.character(as.numeric(year_before)-1)
-# }
+### STEP 1: Acquire the NEON site_data 
+site_data <- readr::read_csv(paste0("https://raw.githubusercontent.com/eco4cast/neon4cast-targets/","main/NEON_Field_Site_Metadata_20220412.csv"),show_col_types = FALSE) |> 
+  dplyr::filter(terrestrial == 1)|> 
+  dplyr::select(field_site_id,field_latitude,field_longitude)
 
-#### For models 4 and 5 we need to determine the different months first
-#### Set the month to download the data and values
+bucket <- "bio230014-bucket01"
+path <- "neon4cast-drivers/noaa/gefs-v12/stage1"
+endpoint <- "https://sdsc.osn.xsede.org"
+
+stage1 <- 
+  glue::glue("{bucket}/{path}/reference_datetime={forecast_date}") |>
+  arrow::s3_bucket(endpoint_override = endpoint, anonymous = TRUE) |>
+  arrow::open_dataset()
+
+
+env_vars <- c("PRES","TSOIL", "SOILW", "WEASD", "SNOD","ICETK")
+
+# Grab the data we need
+driver_data <- stage1 |> 
+  filter(variable %in% env_vars,
+         site_id %in% site_data$field_site_id) |> 
+  collect() |>
+  mutate(prediction = if_else(prediction ==9999.00,NA,prediction)) |>
+  pivot_wider(names_from = "variable",values_from = "prediction")
+
+
+### STEP 2: determine the month and year for which we data to parameterize models (used for models 4 and 5)
+
 curr_month <- driver_data$datetime |>
   min() |>
   month()
@@ -53,14 +77,8 @@ if (curr_month == -1) {
 year_before <- curr_year-1
 
 
-# Acquire the NEON site_data 
-site_data <- readr::read_csv(paste0("https://raw.githubusercontent.com/eco4cast/neon4cast-targets/","main/NEON_Field_Site_Metadata_20220412.csv"),show_col_types = FALSE) |> 
-  dplyr::filter(terrestrial == 1)|> 
-  dplyr::select(field_site_id,field_latitude,field_longitude)
-
-
-
-# Define null model to create soil values
+### STEP 3: Start modeling!
+### Model 3a: Define null model to create soil values
 null_model <- function(TSOIL) {
   
   # Globbed from bigleaf R package scripts
@@ -76,26 +94,6 @@ null_model <- function(TSOIL) {
   return(R_S)
 }
 
-bucket <- "bio230014-bucket01"
-path <- "neon4cast-drivers/noaa/gefs-v12/stage1"
-endpoint <- "https://sdsc.osn.xsede.org"
-
-stage1 <- 
-  glue::glue("{bucket}/{path}/reference_datetime={forecast_date}") |>
-  arrow::s3_bucket(endpoint_override = endpoint, anonymous = TRUE) |>
-  arrow::open_dataset()
-
-
-env_vars <- c("PRES","TSOIL", "SOILW", "WEASD", "SNOD","ICETK")
-
-# Grab the data we need
-driver_data <- stage1 |> 
-  filter(variable %in% env_vars,
-         site_id %in% site_data$field_site_id) |> 
-  collect() |>
-  mutate(prediction = if_else(prediction ==9999.00,NA,prediction)) |>
-  pivot_wider(names_from = "variable",values_from = "prediction")
-
 
 # Compute forecast
 input_forecast_null <- driver_data |>
@@ -103,10 +101,9 @@ input_forecast_null <- driver_data |>
          value = null_model(TSOIL)) |>
   select(-all_of(env_vars))
 
+### Model 3a: linear model using all available data, by site
+### Now do a linear model using all data
 
-### Now do a linear model based on last month's data
-source('R/drivers_available.R')
-source('R/targets_available.R')
 
 # Collect all the known targets and drivers
 drivers <- drivers_available()
@@ -144,11 +141,7 @@ input_forecast_lm <- driver_data |>
 ####
 
 
-### Model 3: 
-
-source("R/download_annual_values.R")
-source("R/fit_exp_soilR.R")
-
+### Model 3c: Fit an exponential model to all data from the year before
 
 drivers <- download_annual_values("drivers",year_before)
 targets <- download_annual_values("targets",year_before)
@@ -186,7 +179,7 @@ input_forecast_exp <- driver_data |>
   mutate(model = 'exp') |>
   select(-all_of(env_vars))
   
-
+## Models 3d and 3e: Get drivers and targets from the previous data drop
 
 drivers_month <- download_annual_values("drivers",curr_year,month = curr_month)
 targets_month <- download_annual_values("targets",curr_year,month = curr_month)
@@ -209,20 +202,7 @@ nested_model_info <- driver_data |>
   inner_join(joined_data_month,by="site_id")
 
 
-# # model 4: fit on a month
-# 
-# drivers_month <- download_annual_values("drivers",year_ref,month = month_before)
-# targets_month <- download_annual_values("targets",year_ref,month = month_before)
-# 
-# # now join by site and day
-# 
-# joined_data_month <- drivers_month |>
-#   inner_join(targets,by=c("site_id","startDateTime")) |>
-#   group_by(site_id) |>
-#   nest() |>
-
-#   select(-data)
-# 
+# # model 3d: exponential model for a given month
 # 
  input_forecast_exp_month <- nested_model_info |>
    mutate(
@@ -235,7 +215,7 @@ nested_model_info <- driver_data |>
    mutate(model = 'exp_month') |>
    select(-all_of(env_vars))
 
-## Model 5 - xgboost!
+## Model 3f - xgboost!
 
 # input_param_data is what we use to parameterize the model
 # input_driver_data is what we use to evaluate the model
