@@ -271,13 +271,25 @@ input_forecast_xg <- nested_model_info |>
 
 forecast_file <- paste0('data/outputs/forecast_prediction-',forecast_date,'.csv')
 
-# glob forecasts together
+# glob forecasts together - we assume that we average across the day
 input_forecast <- rbind(input_forecast_null,
                         input_forecast_lm,
                         input_forecast_exp,
                         input_forecast_exp_month,
                         input_forecast_xg
-                        )
+                        ) |>
+  mutate(day = floor_date(datetime,unit = "day")) |>
+  group_by(site_id,model,day) |>
+  dplyr::reframe(value =
+                   stats::quantile(value,na.rm=TRUE,probs = c(0.025,0.10,0.5,0.9,.975),
+                   ),
+                 name = c("q0.025", "q0.10","q0.5", "q0.90","q0.975"),
+                 mean = mean(value, na.rm = TRUE),
+                 sd = sd(value, na.rm = TRUE)
+  ) |> 
+  tidyr::pivot_wider() |>
+  ungroup()
+
 
 # Write updated data back to CSV
 write_csv(input_forecast, file = forecast_file)
