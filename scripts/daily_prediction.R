@@ -18,6 +18,39 @@ forecast_date <- args[1]
 #   year_ref <- as.character(as.numeric(year_before)-1)
 # }
 
+#### For models 4 and 5 we need to determine the different months first
+#### Set the month to download the data and values
+curr_month <- driver_data$datetime |>
+  min() |>
+  month()
+
+curr_year <- driver_data$datetime |>
+  min() |>
+  year()
+
+curr_day <- driver_data$datetime |>
+  min() |>
+  day()
+
+if(curr_day < 15) {
+  curr_month <- curr_month - 2 # Go two months back
+} else {
+  curr_month <- curr_month - 1
+}
+
+if (curr_month == 0) {
+  curr_month <- 12
+  curr_year <- curr_year - 1
+}
+
+if (curr_month == -1) {
+  curr_month <- 11
+  curr_year <- curr_year - 1
+}
+
+year_before <- curr_year-1
+
+
 # Acquire the NEON site_data 
 site_data <- readr::read_csv(paste0("https://raw.githubusercontent.com/eco4cast/neon4cast-targets/","main/NEON_Field_Site_Metadata_20220412.csv"),show_col_types = FALSE) |> 
   dplyr::filter(terrestrial == 1)|> 
@@ -151,35 +184,6 @@ input_forecast_exp <- driver_data |>
   mutate(model = 'exp') |>
   select(-all_of(env_vars))
   
-#### For models 4 and 5 we need to determine the different months first
-#### Set the month to download the data and values
-curr_month <- driver_data$datetime |>
-  min() |>
-  month()
-
-curr_year <- driver_data$datetime |>
-  min() |>
-  year()
-
-curr_day <- driver_data$datetime |>
-  min() |>
-  day()
-
-if(curr_day < 15) {
-  curr_month <- curr_month - 2 # Go two months back
-} else {
-  curr_month <- curr_month - 1
-}
-
-if (curr_month == 0) {
-  curr_month <- 12
-  curr_year <- curr_year - 1
-}
-
-if (curr_month == -1) {
-  curr_month <- 11
-  curr_year <- curr_year - 1
-}
 
 
 drivers_month <- download_annual_values("drivers",curr_year,month = curr_month)
