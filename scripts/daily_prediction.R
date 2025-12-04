@@ -288,7 +288,8 @@ input_forecast <- rbind(input_forecast_null,
                  sd = sd(value, na.rm = TRUE)
   ) |> 
   tidyr::pivot_wider() |>
-  ungroup()
+  ungroup() |>
+  filter(day == as.Date(forecast_date))  # Just get the forecasts from that day
 
 
 # Write updated data back to CSV
