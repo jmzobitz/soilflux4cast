@@ -85,6 +85,13 @@ jobs:
       - name: Run prediction script
         run: Rscript scripts/daily_prediction.R "${{ matrix.forecast_date }}"
 
+      - name: Clean temporary files
+        run: |
+          rm -rf /tmp/*
+          rm -rf ~/.cache/*
+          rm -rf terraTmp* || true
+
+      
       - name: Configure Git
         run: |
           git config --global user.name "jmzobitz"

@@ -44,6 +44,11 @@ driver_data <- stage1 |>
   pivot_wider(names_from = "variable",values_from = "prediction")
 
 
+# Remove any temporary files
+terra::tmpFiles(remove = TRUE)
+unlink(list.files(tempdir(), full.names = TRUE), recursive = TRUE)
+
+
 ### STEP 2: determine the month and year for which we data to parameterize models (used for models 4 and 5)
 
 curr_month <- driver_data$datetime |>
