@@ -50,37 +50,27 @@ jobs:
           git config --global user.name "jmzobitz"
           git config --global user.email "zobitz@augsburg.edu"
 
-      - name: Set branch name
-        run: echo "BRANCH=neon-monthly-automatic-${{ env.NEON_DATE }}" >> $GITHUB_ENV
 
-      - name: Commit updated forecast files
+      - name: Commit and push updated forecast files
+        env:
+          PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
-          git checkout -B $BRANCH
+          # Ensure we're on main
+          git checkout main
+
+          # Add files (if present)
           git add data/targets/neon_targets-"$NEON_DATE".csv || echo "No targets file"
           git add data/drivers/neon_soil_drivers-"$NEON_DATE".csv || echo "No drivers file"
-          git commit -m "Update forecast output for $NEON_DATE" || echo "No changes to commit"
-          git remote set-url origin https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git
-          git push origin $BRANCH || echo "Nothing to push"
 
-      - name: Create or merge pull request
-        env:
-          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
-        run: |
-          if gh pr view $BRANCH --json number > /dev/null 2>&1; then
-            echo "PR already exists — attempting to merge"
-            gh pr merge --squash --admin || echo "Merge failed"
-          else
-            echo "Creating new PR"
-            gh pr create \
-              --base main \
-              --head $BRANCH \
-              --title "Auto PR: Forecast update $NEON_DATE" \
-              --body "Automated forecast update."
+          # Check if anything changed
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
           fi
 
-          # Merge and auto-delete branch if PR exists
-          if gh pr view $BRANCH --json number > /dev/null 2>&1; then
-            gh pr merge --squash --admin --delete-branch || echo "Merge failed"
-          else
-            echo "No PR to merge"
-          fi
+          # Commit
+          git commit -m "Direct commit: forecast update for $NEON_DATE"
+
+          # Push using PAT
+          git remote set-url origin https://x-access-token:$PAT_TOKEN@github.com/${{ github.repository }}.git
+          git push origin main
