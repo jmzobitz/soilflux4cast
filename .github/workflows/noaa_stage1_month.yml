@@ -4,9 +4,9 @@ permissions:
   contents: write
 
 on:
-  # Run automatically once/month on the 15th at 10 UTC
+  # Run automatically once/month on the 2nd at 10 UTC
   schedule:
-    - cron: '0 10 15 * *'
+    - cron: '0 10 2 * *'
 
   # Allow manual runs with a month range
   workflow_dispatch:
@@ -109,7 +109,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
-          FILE="data/drivers/noaa_stage1_${{ matrix.month }}.csv"
+          FILE="data/drivers/noaa/noaa_stage1_${{ matrix.month }}.csv"
 
           if [ ! -f "$FILE" ]; then
             echo "No output file found for month ${{ matrix.month }}"
