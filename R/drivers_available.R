@@ -22,7 +22,7 @@ drivers_available <- function(dates = NULL) {
   
   # Define repo and path
   repo <- "jmzobitz/soilflux4cast"
-  path <- "data/drivers"
+  path <- "data/drivers/noaa"
   
   # GitHub API URL
   url <- paste0("https://api.github.com/repos/", repo, "/contents/", path)
@@ -34,7 +34,7 @@ drivers_available <- function(dates = NULL) {
   # Base filter: keep only soil driver csv files with YYYY-MM
   files <- files |>
     dplyr::filter(stringr::str_detect(name,
-                                      pattern = "(?<=neon_soil_drivers-)[:digit:]{4}-[:digit:]{2}.*\\.csv$"
+                                      pattern = "(?<=noaa_stage1_)[:digit:]{4}-[:digit:]{2}.*\\.csv$"
     ))
   
   # If dates are provided, restrict further

@@ -17,11 +17,16 @@ download_annual_values <- function(variable = "drivers", year, month = NULL) {
   year  <- as.character(year)
   month <- if (!is.null(month)) sprintf("%02d", as.integer(month)) else NULL
   
+  
   # GitHub API endpoint for directory contents
   api_url <- paste0(
     "https://api.github.com/repos/jmzobitz/soilflux4cast/contents/data/",
     variable
   )
+  
+  if(variable == "drivers") {
+    api_url <- paste0(api_url,"/noaa")
+  }
   
   # Get file listings
   files <- jsonlite::fromJSON(api_url)
@@ -34,6 +39,7 @@ download_annual_values <- function(variable = "drivers", year, month = NULL) {
     # Match specific year + month: e.g., "2017-01"
     grep_string <- paste0(year, "-", month, ".*\\.csv$")
   }
+  
   
   # Filter matching files
   variables <- dplyr::filter(files, grepl(grep_string, name))
