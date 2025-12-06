@@ -1,0 +1,139 @@
+name: NOAA Monthly Stage1 Update
+
+permissions:
+  contents: write
+
+on:
+  # Run automatically once/month on the 15th at 10 UTC
+  schedule:
+    - cron: '0 10 15 * *'
+
+  # Allow manual runs with a month range
+  workflow_dispatch:
+    inputs:
+      start_month:
+        description: "Start month (YYYY-MM)"
+        required: false
+        type: string
+      end_month:
+        description: "End month (YYYY-MM)"
+        required: false
+        type: string
+
+jobs:
+  # ---------------------------------------------------------
+  # 1. Determine mode and produce a list of months
+  # ---------------------------------------------------------
+  determine-months:
+    runs-on: ubuntu-latest
+    outputs:
+      mode: ${{ steps.pick-mode.outputs.mode }}
+      month_list: ${{ steps.pick-mode.outputs.month_list }}
+
+    steps:
+      - name: Determine execution mode
+        id: pick-mode
+        run: |
+          start="${{ github.event.inputs.start_month }}"
+          end="${{ github.event.inputs.end_month }}"
+
+          if [ -n "$start" ] && [ -n "$end" ]; then
+            echo "mode=matrix" >> $GITHUB_OUTPUT
+
+            # Build month sequence
+            # Convert to 1st of month and loop until reaching end month
+            s_date="${start}-01"
+            e_date="${end}-01"
+
+            # Build JSON array of YYYY-MM values
+            months=$( 
+              curr="$s_date"
+              while [ "$(date -d "$curr" +%Y-%m)" != "$(date -d "$e_date + 1 month" +%Y-%m)" ]; do
+                date -d "$curr" +%Y-%m
+                curr=$(date -d "$curr + 1 month" +%Y-%m-01)
+              done |
+              jq -R . | jq -s -c .
+            )
+
+            echo "month_list=$months" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Otherwise: cron mode → run for last month only
+          echo "mode=single" >> $GITHUB_OUTPUT
+          last_month=$(date -d "last month" +%Y-%m)
+          echo "month_list=[\"$last_month\"]" >> $GITHUB_OUTPUT
+
+
+  # ---------------------------------------------------------
+  # 2. NOAA monthly generation job using a matrix of months
+  # ---------------------------------------------------------
+  create-monthly-noaa-file:
+    needs: determine-months
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        month: ${{ fromJson(needs.determine-months.outputs.month_list) }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up R
+        uses: r-lib/actions/setup-r@v2
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libcurl4-openssl-dev libssl-dev libxml2-dev \
+            libharfbuzz-dev libfribidi-dev libfreetype6-dev \
+            libpng-dev libtiff5-dev libjpeg-dev \
+            libgit2-dev libfontconfig1-dev pkg-config
+
+      - name: Install R packages
+        run: |
+          Rscript -e 'install.packages(
+            c("tidyverse","lubridate","arrow"),
+            repos="https://cloud.r-project.org"
+          )'
+
+      - name: Run NOAA script for this month
+        run: |
+          Rscript scripts/get_noaa_month.R "${{ matrix.month }}"
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "jmzobitz"
+          git config --global user.email "zobitz@augsburg.edu"
+
+      - name: Commit monthly NOAA file
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+        run: |
+          FILE="data/drivers/noaa_stage1_${{ matrix.month }}.csv"
+
+          if [ ! -f "$FILE" ]; then
+            echo "No output file found for month ${{ matrix.month }}"
+            exit 0
+          fi
+
+          git add "$FILE"
+
+          if [ -n "$(git status --porcelain)" ]; then
+            git commit -m "NOAA monthly update for ${{ matrix.month }}"
+            git remote set-url origin https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git
+
+            # Retry push if there are collisions
+            for i in {1..5}; do
+              git pull --rebase origin main && git push origin main && break
+              echo "Push failed — retrying..."
+              sleep 5
+            done
+          else
+            echo "No changes to commit."
+          fi
