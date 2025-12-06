@@ -116,7 +116,7 @@ jobs:
             exit 0
           fi
 
-          git add "$FILE"
+          git add -f "$FILE"
 
           if [ -n "$(git status --porcelain)" ]; then
             git commit -m "NOAA monthly update for ${{ matrix.month }}"
