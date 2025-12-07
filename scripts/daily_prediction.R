@@ -135,7 +135,6 @@ fit_vals <- joined_vars |>
   select(site_id,coeff)
 
 
-fit_vals$lm_fit[[1]] |> broom::tidy() 
 
 
 # Compute forecast
@@ -143,7 +142,7 @@ input_forecast_lm <- driver_data |>
   mutate(TSOIL = TSOIL - 273.15) |>
   inner_join(fit_vals,by="site_id") |>
   mutate(model = 'lm',
-         value = pmap_dbl(.l=list(coeff,SOILW,TSOIL),.f=~(..1$estimate[[1]] + ..1$estimate[[2]]*..2 + ..1$estimate[[3]]*..2))  ) |>
+         value = pmap_dbl(.l=list(coeff,SOILW,TSOIL),.f=~(..1$estimate[[1]] + ..1$estimate[[2]]*..2 + ..1$estimate[[3]]*..3))  ) |>
   select(-all_of(env_vars),-coeff)
 
 ####
