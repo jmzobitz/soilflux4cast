@@ -16,6 +16,8 @@ source('R/drivers_available.R')
 source('R/targets_available.R')
 
 
+# Process a single site (env + flux). Usage: Rscript scripts/daily_prediction.R YYYY-MM-DD
+
 args <- commandArgs(trailingOnly = TRUE)
 forecast_date <- args[1]  
 
@@ -41,6 +43,7 @@ driver_data <- stage1 |>
   filter(variable %in% env_vars,
          site_id %in% site_data$field_site_id) |> 
   collect() |>
+  filter(horizon < 86400) |>   # Get up to the day predictions
   mutate(prediction = if_else(prediction ==9999.00,NA,prediction)) |>
   pivot_wider(names_from = "variable",values_from = "prediction")
 
@@ -93,9 +96,9 @@ null_model <- function(TSOIL) {
   # conversion kilogram (kg) to gram (g) = 1000
   # seconds per day = 86400
   
-  conv <- 1e-6 * 0.012011 * 1000 * 86400
+  conv <- 1e-6 * 0.012011 * 1000 * 86400   # avoid this for now
   
-  R_S <- (0.598 + exp(0.044*(TSOIL-273.15)))*conv  # Convert to gC m-2 d-1
+  R_S <- (0.598 + exp(0.044*(TSOIL-273.15)))  #*conv  # Convert to gC m-2 d-1
   
   return(R_S)
 }
@@ -227,31 +230,41 @@ nested_model_info <- driver_data |>
 # input_driver_data is what we use to evaluate the model
 compute_xgboost <- function(input_param_data,input_eval_data) {
   
-  # Convert to matrix
-  X <- input_param_data |> select(TSOIL,SOILW) |>
-    as.matrix()
+  input_param_data <- input_param_data |> drop_na()
   
-  Y <- input_param_data |> pull(flux)
+  if(nrow(input_param_data) > 5)  {
+    
+    # Convert to matrix
+    X <- input_param_data |> 
+      select(TSOIL,SOILW) |>
+      as.matrix()
+    
+    Y <- input_param_data |> pull(flux)
+    
+    
+    dtrain <- xgb.DMatrix(data = X, label = Y)
+    
+    model <- xgboost(
+      data = dtrain,
+      objective = "reg:squarederror",
+      max_depth = 3,
+      eta = 0.1,
+      nrounds = 200,
+      verbose = 0
+    )
+    
+    
+    eval_matrix <- input_eval_data |>
+      select(TSOIL,SOILW) |>
+      as.matrix()
+    
+    # Predictions
+    input_eval_data$value <- predict(model, eval_matrix)
+    
+  } else {
+    input_eval_data$value <- NA
+  }
   
-  
-  dtrain <- xgb.DMatrix(data = X, label = Y)
-  
-  model <- xgboost(
-    data = dtrain,
-    objective = "reg:squarederror",
-    max_depth = 3,
-    eta = 0.1,
-    nrounds = 200,
-    verbose = 0
-  )
-  
-  
-  eval_matrix <- input_eval_data |>
-    select(TSOIL,SOILW) |>
-    as.matrix()
-  
-  # Predictions
-  input_eval_data$value <- predict(model, eval_matrix)
   
   return(input_eval_data)
   
