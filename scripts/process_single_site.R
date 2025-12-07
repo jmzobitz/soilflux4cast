@@ -65,21 +65,22 @@ try({
   ) |>
     select(-any_of("surface_diffusivity")) |>
     unnest(cols = c(flux_compute)) |>
-    group_by(startDateTime) |>
-    mutate(
-      flux = flux * conv,
-      flux_err = flux_err * conv
-    ) |>
-    summarize(
-      flux_out = mean(flux, na.rm = TRUE),
-      flux_err = sd(flux, na.rm = TRUE) / sqrt(sum(!is.na(flux))),
-      .groups = "drop"
-    ) |>
-    rename(flux = flux_out) |>
+    # group_by(startDateTime) |>
+    # mutate(
+    #   flux = flux * conv,
+    #   flux_err = flux_err * conv
+    # ) |>
+    # summarize(
+    #   flux_out = mean(flux, na.rm = TRUE),
+    #   flux_err = sd(flux, na.rm = TRUE) / sqrt(sum(!is.na(flux))),
+    #   .groups = "drop"
+    # ) |>
+    # rename(flux = flux_out) |>
     group_by(startDateTime = floor_date(startDateTime, unit = "day")) |>
     summarize(
-      flux = sum(flux, na.rm = TRUE),
-      flux_err = sqrt(sum(flux_err^2, na.rm = TRUE)),
+      flux = mean(flux, na.rm = TRUE),   # do average daily flux (for now)
+      #flux_err = sqrt(sum(flux_err^2, na.rm = TRUE)),
+      flux_err = mean(flux_err, na.rm = TRUE), 
       .groups = "drop"
     ) |>
     ungroup() |>
