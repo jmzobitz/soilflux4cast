@@ -7,6 +7,7 @@ library(purrr)
 library(xgboost)
 library(lubridate)
 library(tidyverse)
+library(broom)
 
 ### Source some functions
 source("R/download_annual_values.R")
@@ -117,10 +118,9 @@ targets <- targets_available()
 # Now join the two together, by siteID and date, nesting them by site
 
 joined_vars <- targets |>
-  inner_join(drivers, by=c("site_id","startDateTime")) |> 
+  inner_join(drivers, by=c("site_id","startDateTime"="datetime")) |> 
   drop_na() |>
-  rename(SOILW = VSWC,
-         TSOIL = SOILT) |>
+  mutate(TSOIL = TSOIL - 273.15) |>
   group_by(site_id) |>
   nest()
 
@@ -129,19 +129,22 @@ joined_vars <- targets |>
 # Now mutate and do a linear model
 fit_vals <- joined_vars |>
   mutate(lm_fit = map(.x=data,.f=~lm(flux~SOILW+TSOIL,data=.x)),
-         coeff = map(.x=lm_fit,.f=~(.x$coefficients)),
+         coeff = map(.x=lm_fit,.f=~(.x |> broom::tidy())),
          sigma = map_dbl(.x=lm_fit,.f=~(sd(.x$residuals)))
   ) |>
-  select(site_id,lm_fit,coeff)
+  select(site_id,coeff)
 
+
+fit_vals$lm_fit[[1]] |> broom::tidy() 
 
 
 # Compute forecast
 input_forecast_lm <- driver_data |>
+  mutate(TSOIL = TSOIL - 273.15) |>
   inner_join(fit_vals,by="site_id") |>
   mutate(model = 'lm',
-         value = pmap_dbl(.l=list(lm_fit,TSOIL,SOILW),.f=~predict(..1,tibble(TSOIL=..2-273.15,SOILW=..3)) ) ) |>
-  select(-all_of(env_vars),-lm_fit,-coeff)
+         value = pmap_dbl(.l=list(coeff,SOILW,TSOIL),.f=~(..1$estimate[[1]] + ..1$estimate[[2]]*..2 + ..1$estimate[[3]]*..2))  ) |>
+  select(-all_of(env_vars),-coeff)
 
 ####
 
@@ -153,8 +156,9 @@ targets <- download_annual_values("targets",year_before)
 
 # now join by site and day
 
-joined_data <- drivers |>
-  inner_join(targets,by=c("site_id","startDateTime")) |>
+joined_data <- targets |>
+  inner_join(drivers,by=c("site_id","startDateTime"="datetime")) |>
+  mutate(TSOIL = TSOIL - 273.15) |>
   group_by(site_id) |>
   nest() |>
   mutate(fit_coeff = map(data,fit_exp_soilR)) |>
@@ -190,10 +194,9 @@ drivers_month <- download_annual_values("drivers",curr_year,month = curr_month)
 targets_month <- download_annual_values("targets",curr_year,month = curr_month)
 # Acquire and download the model and
 
-joined_data_month <- drivers_month |>
-  inner_join(targets_month,by=c("site_id","startDateTime")) |>
-  rename(TSOIL = SOILT,
-         SOILW = VSWC) |>
+joined_data_month <- targets_month |>
+  inner_join(drivers_month,by=c("site_id","startDateTime"="datetime")) |>
+  mutate(TSOIL = TSOIL - 273.15) |>
   group_by(site_id) |>
   nest() |>
   rename(param_data = data)
@@ -210,10 +213,9 @@ nested_model_info <- driver_data |>
 # # model 3d: exponential model for a given month
 # 
  input_forecast_exp_month <- nested_model_info |>
-   mutate(
-     param_data_temp = map(.x=param_data,.f=~(.x |> rename(SOILT=TSOIL) ) ),
-     fit_coeff = map(param_data_temp,fit_exp_soilR)) |>
-   select(-param_data_temp) |>
+   mutate(,
+     fit_coeff = map(param_data,fit_exp_soilR)) |>
+   select(-param_data) |>
    mutate(fit_value = map2(.x=fit_coeff,.y=eval_data,.f=~calc_soilR(.x,.y))) |>
    select(site_id,fit_value) |>
    unnest(cols=c(fit_value)) |>

@@ -15,7 +15,7 @@ fit_exp_soilR <- function(input_data) {
   
   mod_data <- input_data |>
     mutate(ln_flux = log(flux),
-           T10 = (SOILT-10)/10) |>
+           T10 = (TSOIL-10)/10) |>
     filter(if_all(everything(), ~ !is.na(.x) & is.finite(.x)))
   
   #print(mod_data)
