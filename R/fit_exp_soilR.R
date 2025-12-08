@@ -26,7 +26,7 @@ fit_exp_soilR <- function(input_data) {
       select(term,estimate) |>
       rename(value = estimate) |>
       mutate(term = if_else(term =="T10","Q10","kR"),
-             value = if_else(term == "kR",exp(value),value))
+             value = exp(value))
     
     
     

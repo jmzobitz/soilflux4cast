@@ -135,18 +135,48 @@ fit_vals <- joined_vars |>
          coeff = map(.x=lm_fit,.f=~(.x |> broom::tidy())),
          sigma = map_dbl(.x=lm_fit,.f=~(sd(.x$residuals)))
   ) |>
-  select(site_id,coeff)
+  select(site_id,coeff,sigma)
 
 
+update_lm_model <- function(input_coeff,sigma_ps,SOILW,TSOIL,unc_fac=1) {
+  
+  n_ps <- length(sigma_ps)
+  
+  # New dataset with new covariates
+  newdat <- tibble(
+    SOILW,
+    TSOIL
+  )
+  
+  coeff <- input_coeff |>
+    mutate(estimate = map2_dbl(.x=estimate,.y=std.error,.f=~(.x+rnorm(1,mean=0,sd = unc_fac*.y)) ) ) |>
+    select(term,estimate)
+  
+  # Convert to named vector
+  coef_vec <- deframe(coeff)
+  
+  # Create prediction matrix (include intercept by adding a column of 1)
+  X <- model.matrix(~ 1 + SOILW + TSOIL, data = newdat)
+  
+  # Predictions
+  pred <- (X %*% coef_vec) + rnorm(n_ps,mean=0,sd=sigma_ps)  |>
+    as.numeric()
+  
+  return(pred)
+  
+  
 
+  
+  
+}
 
 # Compute forecast
 input_forecast_lm <- driver_data |>
   mutate(TSOIL = TSOIL - 273.15) |>
   inner_join(fit_vals,by="site_id") |>
   mutate(model = 'lm',
-         value = pmap_dbl(.l=list(coeff,SOILW,TSOIL),.f=~(..1$estimate[[1]] + ..1$estimate[[2]]*..2 + ..1$estimate[[3]]*..3))  ) |>
-  select(-all_of(env_vars),-coeff)
+         value = pmap_dbl(.l=list(coeff,sigma,SOILW,TSOIL),.f=~update_lm_model(..1,..2,..3,..4)) ) |>
+  select(-all_of(env_vars),-coeff,-sigma)
 
 ####
 
@@ -158,76 +188,142 @@ targets <- download_annual_values("targets",year_before)
 
 # now join by site and day
 
-joined_data <- targets |>
+joined_vars <- targets |>
   inner_join(drivers,by=c("site_id","startDateTime"="datetime")) |>
-  mutate(TSOIL = TSOIL - 273.15) |>
+  mutate(TSOIL10 = (TSOIL - 273.15 - 10)/10,
+         ln_flux = log(flux),
+         ln_ok = ((!is.na(ln_flux) & is.finite(ln_flux) & 
+                     !is.na(TSOIL10)))
+         ) |>
+  filter(ln_ok) |>
   group_by(site_id) |>
   nest() |>
-  mutate(fit_coeff = map(data,fit_exp_soilR)) |>
-  select(-data)
+  mutate(n_obs = map_dbl(data,nrow)) |>
+  filter(n_obs > 2) |>
+  select(-n_obs)
 
-calc_soilR <- function(params,data) {
+
+# Now mutate and do a linear model
+fit_vals <- joined_vars |>
+  mutate(lm_fit = map(.x=data,.f=~lm(ln_flux~TSOIL10,data=.x)),
+         coeff = map(.x=lm_fit,.f=~(.x |> broom::tidy())),
+         sigma = map_dbl(.x=lm_fit,.f=~(sd(.x$residuals)))
+  ) |>
+  select(site_id,coeff,sigma)
+
+
+update_lm_model <- function(input_coeff,sigma_ps,TSOIL,unc_fac=1) {
   
-  TSOIL <- data$TSOIL
-  kR <- params |> filter(term == "kR") |> pull(value)
-  Q10 <- params |> filter(term == "Q10") |> pull(value)
+  n_ps <- length(sigma_ps)
   
-  data <- data |>
-    mutate(value = kR*Q10^((TSOIL-10))/10)
+  # New dataset with new covariates
+  newdat <- tibble(
+    TSOIL
+  )
   
-  return(data)
+  coeff <- input_coeff |>
+    mutate(estimate = map2_dbl(.x=estimate,.y=std.error,.f=~(.x+rnorm(1,mean=0,sd = unc_fac*.y)) ) ) |>
+    select(term,estimate)
+  
+  # Convert to named vector
+  coef_vec <- deframe(coeff)
+  
+  # Create prediction matrix (include intercept by adding a column of 1)
+  X <- model.matrix(~ 1 + TSOIL, data = newdat)
+  
+  # Predictions
+  pred <- (X %*% coef_vec) + rnorm(n_ps,mean=0,sd=sigma_ps)  |>
+    as.numeric()
+  
+  return(pred)
+  
   
 }
 
+# Compute forecast
 input_forecast_exp <- driver_data |>
-  mutate(TSOIL = TSOIL-273.15) |>
-  group_by(site_id) |>
-  nest() |>
-  inner_join(joined_data,by="site_id") |>
-  mutate(fit_value = map2(.x=fit_coeff,.y=data,.f=~calc_soilR(.x,.y))) |>
-  select(site_id,fit_value) |>
-  unnest(cols=c(fit_value)) |>
-  mutate(model = 'exp') |>
-  select(-all_of(env_vars))
-  
+  mutate(TSOIL10 = (TSOIL - 273.15-10)/10 ) |>
+  inner_join(fit_vals,by="site_id") |>
+  mutate(model = 'exp',
+         value = pmap_dbl(.l=list(coeff,sigma,TSOIL10),.f=~update_lm_model(..1,..2,..3) |> exp()) ) |>   # convert back to exponential
+  select(-all_of(env_vars),-coeff,-sigma,-TSOIL10)
+
+
+
 ## Models 3d and 3e: Get drivers and targets from the previous data drop
 
 drivers_month <- download_annual_values("drivers",curr_year,month = curr_month)
 targets_month <- download_annual_values("targets",curr_year,month = curr_month)
 # Acquire and download the model and
 
-joined_data_month <- targets_month |>
+joined_vars_month <- targets_month |>
   inner_join(drivers_month,by=c("site_id","startDateTime"="datetime")) |>
-  mutate(TSOIL = TSOIL - 273.15) |>
+  mutate(TSOIL10 = (TSOIL - 273.15-10)/10,
+         TSOIL = TSOIL - 273.15,
+         ln_flux = log(flux),
+         ln_ok = ((!is.na(ln_flux) & is.finite(ln_flux) & 
+                     !is.na(TSOIL10)))
+  ) |>
+  filter(ln_ok) |>
   group_by(site_id) |>
   nest() |>
-  rename(param_data = data)
-
-# We can use this for each month - shared between each model
-nested_model_info <- driver_data |>
-  mutate(TSOIL = TSOIL-273.15) |>
-  group_by(site_id) |>
-  nest() |>
-  rename(eval_data = data) |>
-  inner_join(joined_data_month,by="site_id")
+  mutate(n_obs = map_dbl(data,nrow)) |>
+  filter(n_obs > 2) |>
+  select(-n_obs)
 
 
-# # model 3d: exponential model for a given month
-# 
- input_forecast_exp_month <- nested_model_info |>
-   mutate(,
-     fit_coeff = map(param_data,fit_exp_soilR)) |>
-   select(-param_data) |>
-   mutate(fit_value = map2(.x=fit_coeff,.y=eval_data,.f=~calc_soilR(.x,.y))) |>
-   select(site_id,fit_value) |>
-   unnest(cols=c(fit_value)) |>
-   mutate(model = 'exp_month') |>
-   select(-all_of(env_vars))
+# Now mutate and do a linear model
+fit_vals_month <- joined_vars_month |>
+  mutate(lm_fit = map(.x=data,.f=~lm(ln_flux~TSOIL10,data=.x)),
+         coeff = map(.x=lm_fit,.f=~(.x |> broom::tidy())),
+         sigma = map_dbl(.x=lm_fit,.f=~(sd(.x$residuals)))
+  ) |>
+  select(site_id,coeff,sigma)
 
-## Model 3f - xgboost!
+
+update_lm_model <- function(input_coeff,sigma_ps,TSOIL,unc_fac=1) {
+  
+  n_ps <- length(sigma_ps)
+  
+  # New dataset with new covariates
+  newdat <- tibble(
+    TSOIL
+  )
+  
+  coeff <- input_coeff |>
+    mutate(estimate = map2_dbl(.x=estimate,.y=std.error,.f=~(.x+rnorm(1,mean=0,sd = unc_fac*.y)) ) ) |>
+    select(term,estimate)
+  
+  # Convert to named vector
+  coef_vec <- deframe(coeff)
+  
+  # Create prediction matrix (include intercept by adding a column of 1)
+  X <- model.matrix(~ 1 + TSOIL, data = newdat)
+  
+  # Predictions
+  pred <- (X %*% coef_vec) + rnorm(n_ps,mean=0,sd=sigma_ps)  |>
+    as.numeric()
+  
+  return(pred)
+  
+  
+}
+
+# Compute forecast
+input_forecast_exp_month <- driver_data |>
+  mutate(TSOIL10 = (TSOIL - 273.15-10)/10 ) |>
+  inner_join(fit_vals_month,by="site_id") |>
+  mutate(model = 'exp_month',
+         value = pmap_dbl(.l=list(coeff,sigma,TSOIL10),.f=~update_lm_model(..1,..2,..3) |> exp()) ) |>   # convert back to exponential
+  select(-all_of(env_vars),-coeff,-sigma,-TSOIL10)
+
+
+
+## Model 3e - xgboost!
 
 # input_param_data is what we use to parameterize the model
 # input_driver_data is what we use to evaluate the model
+# computes process ID - no parameter uncertainty
 compute_xgboost <- function(input_param_data,input_eval_data) {
   
   input_param_data <- input_param_data |> drop_na()
@@ -253,13 +349,18 @@ compute_xgboost <- function(input_param_data,input_eval_data) {
       verbose = 0
     )
     
+    sigma_ps <- sd(getinfo(dtrain, "label") - predict(model, dtrain))
+
     
     eval_matrix <- input_eval_data |>
       select(TSOIL,SOILW) |>
       as.matrix()
     
     # Predictions
-    input_eval_data$value <- predict(model, eval_matrix)
+    input_eval_data$value <- predict(model, eval_matrix) + rnorm(1,mean=0,sd=sigma_ps)
+    
+    
+    
     
   } else {
     input_eval_data$value <- NA
@@ -272,10 +373,27 @@ compute_xgboost <- function(input_param_data,input_eval_data) {
 }
 
 # now join by site and day
+eval_data <- driver_data |>
+  group_by(site_id) |>
+  nest() |>
+  rename(eval_data = data)
 
 # Now ready to map!
+joined_vars_month <- targets_month |>
+  inner_join(drivers_month,by=c("site_id","startDateTime"="datetime")) |>
+  mutate(
+         TSOIL = TSOIL - 273.15
+         ) |>
+  group_by(site_id) |>
+  nest() |>
+  mutate(n_obs = map_dbl(data,nrow)) |>
+  filter(n_obs > 5) |>
+  select(-n_obs) |>
+  rename(param_data = data) |>
+  inner_join(eval_data,by="site_id")
 
-input_forecast_xg <- nested_model_info |>
+
+input_forecast_xg <- joined_vars_month  |>
   mutate(fit_value = map2(.x=param_data,.y=eval_data,.f=~compute_xgboost(.x,.y))) |>
   select(site_id,fit_value) |>
   unnest(cols=c(fit_value)) |>
@@ -286,8 +404,7 @@ input_forecast_xg <- nested_model_info |>
 forecast_file <- paste0('data/outputs/forecast_prediction-',forecast_date,'.csv')
 
 # glob forecasts together - we assume that we average across the day
-input_forecast <- rbind(input_forecast_null,
-                        input_forecast_lm,
+input_forecast <- rbind(input_forecast_lm,
                         input_forecast_exp,
                         input_forecast_exp_month,
                         input_forecast_xg
