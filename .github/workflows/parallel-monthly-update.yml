@@ -195,7 +195,7 @@ jobs:
           FILE1="data/drivers/neon_soil_drivers-${{ steps.determine_month.outputs.month }}.csv"
           FILE2="data/targets/neon_targets-${{ steps.determine_month.outputs.month }}.csv"
 
-git commit -m "Monthly update for ${{ steps.determine_month.outputs.month }}"
+          git commit -m "Monthly update for ${{ steps.determine_month.outputs.month }}"
 
           # Force-add in case data/ is ignored
           if [ -f "$FILE1" ]; then git add -f "$FILE1"; fi
