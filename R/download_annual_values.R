@@ -19,14 +19,21 @@ download_annual_values <- function(variable = "drivers", year, month = NULL) {
   
   
   # GitHub API endpoint for directory contents
-  api_url <- paste0(
-    "https://api.github.com/repos/jmzobitz/soilflux4cast/contents/data/",
-    variable
-  )
+  api_url <- "https://api.github.com/repos/jmzobitz/soilflux4cast/contents/data/"
+  
   
   if(variable == "drivers") {
-    api_url <- paste0(api_url,"/noaa")
+    api_url <- paste0(api_url,"drivers/noaa")
   }
+  
+  if(variable == "targets") {
+    api_url <- paste0(api_url,"targets")
+  }
+  
+  if(variable == "soil-env") {
+    api_url <- paste0(api_url,"drivers")
+  }
+  
   
   # Get file listings
   files <- jsonlite::fromJSON(api_url)

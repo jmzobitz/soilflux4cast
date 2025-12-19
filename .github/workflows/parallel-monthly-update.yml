@@ -166,10 +166,21 @@ jobs:
           done
           echo "Workspace data/ contents after copying artifacts:"
           ls -R data || true
+          
+
+      - name: Determine month
+        id: determine_month
+        run: |
+          if [ -n "${{ github.event.inputs.month }}" ]; then
+            echo "month=${{ github.event.inputs.month }}" >> $GITHUB_OUTPUT
+          else
+            MONTH=$(date -d "$(date +%Y-%m-01) -1 month" +%Y-%m)
+            echo "month=$MONTH" >> $GITHUB_OUTPUT
+          fi
 
       - name: Combine outputs
         run: |
-          Rscript scripts/combine_month.R "${{ github.event.inputs.month }}"
+          Rscript scripts/combine_month.R "${{ steps.determine_month.outputs.month }}"
 
       - name: Commit directly to main
         env:
@@ -181,8 +192,10 @@ jobs:
           git checkout main
           git pull origin main
 
-          FILE1="data/drivers/neon_soil_drivers-${{ github.event.inputs.month }}.csv"
-          FILE2="data/targets/neon_targets-${{ github.event.inputs.month }}.csv"
+          FILE1="data/drivers/neon_soil_drivers-${{ steps.determine_month.outputs.month }}.csv"
+          FILE2="data/targets/neon_targets-${{ steps.determine_month.outputs.month }}.csv"
+
+git commit -m "Monthly update for ${{ steps.determine_month.outputs.month }}"
 
           # Force-add in case data/ is ignored
           if [ -f "$FILE1" ]; then git add -f "$FILE1"; fi
