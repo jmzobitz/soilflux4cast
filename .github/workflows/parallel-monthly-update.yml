@@ -20,10 +20,8 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       sites: ${{ steps.get_sites.outputs.sites }}
-
     steps:
       - uses: actions/checkout@v3
-
       - uses: r-lib/actions/setup-r@v2
 
       - name: Install system dependencies for terra
@@ -40,7 +38,6 @@ jobs:
         id: get_sites
         shell: bash
         run: |
-          # Run R and produce minimal one-line JSON
           JSON=$(Rscript --vanilla --quiet -e '
             source("renv/activate.R")
             library(tidyverse)
@@ -53,26 +50,36 @@ jobs:
 
             terrestrial_sites <- d |> filter(terrestrial == 1) |> pull(field_site_id)
 
-            # Output compact JSON
             cat(jsonlite::toJSON(terrestrial_sites, auto_unbox = TRUE, pretty = FALSE))
           ')
 
-          # Base64 encode to fully protect formatting (recommended practice)
+          # Encode JSON for safe GitHub Actions output
           ENCODED=$(echo -n "$JSON" | base64 -w 0)
-
           echo "sites=$ENCODED" >> "$GITHUB_OUTPUT"
 
-  process-site:
+  decode-sites:
     needs: determine-sites
+    runs-on: ubuntu-latest
+    outputs:
+      sites_decoded: ${{ steps.decode.outputs.sites_decoded }}
+    steps:
+      - name: Decode Base64 to JSON
+        id: decode
+        shell: bash
+        run: |
+          JSON=$(echo "${{ needs.determine-sites.outputs.sites }}" | base64 --decode)
+          echo "sites_decoded=$JSON" >> "$GITHUB_OUTPUT"
+
+  process-site:
+    needs: decode-sites
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        site: ${{ fromJson(base64decode(needs.determine-sites.outputs.sites)) }}
+        site: ${{ fromJson(needs.decode-sites.outputs.sites_decoded) }}
 
     steps:
       - uses: actions/checkout@v3
-
       - uses: r-lib/actions/setup-r@v2
 
       - name: Install system dependencies for terra
@@ -80,7 +87,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libgdal-dev libproj-dev libgeos-dev
 
-      - name: Restore required R packages
+      - name: Restore R packages needed for processing
         env:
           GITHUB_PAT: ${{ secrets.PAT_TOKEN }}
         run: |
@@ -99,7 +106,6 @@ jobs:
           if [ -n "${{ github.event.inputs.month }}" ]; then
             echo "month=${{ github.event.inputs.month }}" >> $GITHUB_OUTPUT
           else
-            # More robust previous-month calculation
             MONTH=$(date -u -d "$(date -u +%Y-%m-01) -1 month" +%Y-%m)
             echo "month=$MONTH" >> $GITHUB_OUTPUT
           fi
@@ -126,10 +132,8 @@ jobs:
   reduce:
     needs: process-site
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v3
-
       - uses: r-lib/actions/setup-r@v2
 
       - name: Install system dependencies for terra
@@ -137,7 +141,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libgdal-dev libproj-dev libgeos-dev
 
-      - name: Restore minimal required R packages
+      - name: Restore minimal R packages
         env:
           GITHUB_PAT: ${{ secrets.PAT_TOKEN }}
         run: |
@@ -169,7 +173,6 @@ jobs:
               cp -v "$d"/data/targets/neon/* data/targets/neon/ || true
             fi
           done
-
           echo "Merged workspace:"
           ls -R data || true
 
@@ -181,7 +184,6 @@ jobs:
           else
             MONTH=$(date -u -d "$(date -u +%Y-%m-01) -1 month" +%Y-%m)
             echo "month=$MONTH" >> $GITHUB_OUTPUT
-          fi
 
       - name: Combine outputs
         run: |
