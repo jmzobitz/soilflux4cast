@@ -20,8 +20,10 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       sites: ${{ steps.get_sites.outputs.sites }}
+
     steps:
       - uses: actions/checkout@v3
+
       - uses: r-lib/actions/setup-r@v2
 
       - name: Install system dependencies for terra
@@ -33,71 +35,39 @@ jobs:
         env:
           GITHUB_PAT: ${{ secrets.PAT_TOKEN }}
         run: Rscript -e 'renv::restore(prompt = FALSE)'
+          
 
-      - name: Get list of terrestrial NEON sites
+      - name: Get list of NEON site_ids
         id: get_sites
-        shell: bash
         run: |
-          # Generate compact JSON from R
-          JSON=$(Rscript --vanilla --quiet -e '
-            source("renv/activate.R")
+          SITES=$(Rscript --vanilla --quiet -e '
+            source("renv/activate.R")      # Ensure packages are visible
             library(tidyverse)
             library(jsonlite)
-
             d <- readr::read_csv(
               "https://raw.githubusercontent.com/eco4cast/neon4cast-targets/main/NEON_Field_Site_Metadata_20220412.csv",
               show_col_types = FALSE
             )
-
             terrestrial_sites <- d |> filter(terrestrial == 1) |> pull(field_site_id)
-
-            cat(jsonlite::toJSON(terrestrial_sites, auto_unbox = TRUE, pretty = FALSE))
+            # Output JSON as single line
+            cat(jsonlite::toJSON(terrestrial_sites, auto_unbox=TRUE))
           ')
+          echo "sites=$SITES" >> $GITHUB_OUTPUT
 
-          # Trim whitespace and newlines
-          JSON=$(echo -n "$JSON" | tr -d '\r\n' | sed 's/^[ \t]*//;s/[ \t]*$//')
-
-          # Base64 encode JSON
-          ENCODED=$(echo -n "$JSON" | base64 -w 0)
-
-          # Heredoc-safe output
-          {
-            echo "sites<<EOF"
-            echo "$ENCODED"
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
-
-  decode-sites:
-    needs: determine-sites
-    runs-on: ubuntu-latest
-    outputs:
-      sites_decoded: ${{ steps.decode.outputs.sites_decoded }}
-    steps:
-      - name: Decode Base64 to JSON
-        id: decode
-        shell: bash
-        run: |
-          JSON=$(echo "${{ needs.determine-sites.outputs.sites }}" | base64 --decode)
-          # Trim whitespace and newlines
-          JSON=$(echo -n "$JSON" | tr -d '\r\n' | sed 's/^[ \t]*//;s/[ \t]*$//')
-
-          # Heredoc-safe output for matrix
-          {
-            echo "sites_decoded<<EOF"
-            echo "$JSON"
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
 
   process-site:
-    needs: decode-sites
+    needs: determine-sites
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        site: ${{ fromJson(needs.decode-sites.outputs.sites_decoded) }}
+        site: ${{ fromJson(needs.determine-sites.outputs.sites) }}
+    outputs:
+      site: ${{ matrix.site }}
 
     steps:
       - uses: actions/checkout@v3
+
       - uses: r-lib/actions/setup-r@v2
 
       - name: Install system dependencies for terra
@@ -105,7 +75,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libgdal-dev libproj-dev libgeos-dev
 
-      - name: Restore required R packages
+      - name: Restore only needed R packages
         env:
           GITHUB_PAT: ${{ secrets.PAT_TOKEN }}
         run: |
@@ -113,7 +83,7 @@ jobs:
             install.packages("renv", repos="https://cloud.r-project.org")
             source("renv/activate.R")
             renv::restore(
-              packages = c("tidyverse", "neonUtilities", "neonSoilFlux"),
+              packages = c("tidyverse", "neonUtilities","neonSoilFlux"),
               prompt = FALSE
             )
           '
@@ -124,19 +94,22 @@ jobs:
           if [ -n "${{ github.event.inputs.month }}" ]; then
             echo "month=${{ github.event.inputs.month }}" >> $GITHUB_OUTPUT
           else
-            MONTH=$(date -u -d "$(date -u +%Y-%m-01) -1 month" +%Y-%m)
+            MONTH=$(date -d "$(date +%Y-%m-01) -1 month" +%Y-%m)
             echo "month=$MONTH" >> $GITHUB_OUTPUT
           fi
 
       - name: Run single-site processing
-        continue-on-error: true
+        continue-on-error: true   # ensures workflow continues even if this fails
         run: |
           Rscript scripts/process_single_site.R \
             "${{ matrix.site }}" \
             "${{ steps.determine_month.outputs.month }}"
 
+      - name: List files before upload
+        run: ls -R data/drivers/neon data/targets/neon || true
+
       - name: Upload site artifacts
-        if: always()
+        if: always()   # ensures upload runs even if previous steps failed
         uses: actions/upload-artifact@v4
         with:
           name: site-${{ matrix.site }}
@@ -144,11 +117,14 @@ jobs:
             data/drivers/neon/soil_drivers-${{ matrix.site }}-${{ steps.determine_month.outputs.month }}.csv
             data/targets/neon/forecast_prediction-${{ matrix.site }}-${{ steps.determine_month.outputs.month }}.csv
 
+
   reduce:
     needs: process-site
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v3
+
       - uses: r-lib/actions/setup-r@v2
 
       - name: Install system dependencies for terra
@@ -156,7 +132,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libgdal-dev libproj-dev libgeos-dev
 
-      - name: Restore minimal R packages
+      - name: Restore only needed R packages
         env:
           GITHUB_PAT: ${{ secrets.PAT_TOKEN }}
         run: |
@@ -176,7 +152,7 @@ jobs:
           path: .
           merge-multiple: true
 
-      - name: Merge downloaded artifacts
+      - name: Merge downloaded artifacts into workspace
         run: |
           for d in site-*; do
             if [ -d "$d/data/drivers/neon" ]; then
@@ -188,8 +164,9 @@ jobs:
               cp -v "$d"/data/targets/neon/* data/targets/neon/ || true
             fi
           done
-          echo "Merged workspace:"
+          echo "Workspace data/ contents after copying artifacts:"
           ls -R data || true
+          
 
       - name: Determine month
         id: determine_month
@@ -197,14 +174,15 @@ jobs:
           if [ -n "${{ github.event.inputs.month }}" ]; then
             echo "month=${{ github.event.inputs.month }}" >> $GITHUB_OUTPUT
           else
-            MONTH=$(date -u -d "$(date -u +%Y-%m-01) -1 month" +%Y-%m)
+            MONTH=$(date -d "$(date +%Y-%m-01) -1 month" +%Y-%m)
             echo "month=$MONTH" >> $GITHUB_OUTPUT
+          fi
 
       - name: Combine outputs
         run: |
           Rscript scripts/combine_month.R "${{ steps.determine_month.outputs.month }}"
 
-      - name: Commit combined results to main
+      - name: Commit directly to main
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
@@ -217,10 +195,15 @@ jobs:
           FILE1="data/drivers/neon_soil_drivers-${{ steps.determine_month.outputs.month }}.csv"
           FILE2="data/targets/neon_targets-${{ steps.determine_month.outputs.month }}.csv"
 
-          git add -f "$FILE1" "$FILE2" 2>/dev/null || true
+          git commit -m "Monthly update for ${{ steps.determine_month.outputs.month }}"
 
+          # Force-add in case data/ is ignored
+          if [ -f "$FILE1" ]; then git add -f "$FILE1"; fi
+          if [ -f "$FILE2" ]; then git add -f "$FILE2"; fi
+
+          # Commit only if any changes exist
           if [ -n "$(git status --porcelain)" ]; then
-            git commit -m "Monthly update for ${{ steps.determine_month.outputs.month }}"
+            git commit -m "Monthly update for ${{ github.event.inputs.month }}"
             git push origin main
           else
             echo "No changes to commit."
