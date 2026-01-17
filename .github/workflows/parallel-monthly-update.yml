@@ -49,10 +49,18 @@ jobs:
               show_col_types = FALSE
             )
             terrestrial_sites <- d |> filter(terrestrial == 1) |> pull(field_site_id)
-            # Output JSON as single line
-            cat(jsonlite::toJSON(terrestrial_sites, auto_unbox=TRUE))
+            
+            # Output compact JSON with no whitespace/newlines
+            cat(jsonlite::toJSON(terrestrial_sites, auto_unbox = TRUE))
           ')
-          echo "sites=$SITES" >> $GITHUB_OUTPUT
+          
+          {
+            echo "sites<<EOF"
+            echo "$SITES"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+
 
 
   process-site:
