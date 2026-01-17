@@ -17,26 +17,42 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       sites: ${{ steps.get_sites.outputs.sites }}
-      month: ${{ steps.determine_month.outputs.month }}
+      month: ${{ steps.get_sites.outputs.month }}
     steps:
       - uses: actions/checkout@v4
+
       - uses: r-lib/actions/setup-r@v2
-      
+        with:
+          use-public-rspm: true
+
       - name: Get sites and month
         id: get_sites
+        shell: bash
         run: |
           # 1. Determine Month
           USER_MONTH="${{ github.event.inputs.month }}"
           MONTH=${USER_MONTH:-$(date -d "$(date +%Y-%m-01) -1 month" +%Y-%m)}
           echo "month=$MONTH" >> $GITHUB_OUTPUT
 
-          # 2. Get Sites as JSON
-          # We install jsonlite on the fly to keep it lightweight
-          SITES=$(Rscript -e '
-            install.packages("jsonlite", repos="https://cloud.r-project.org")
+          # 2. Get Sites as JSON (Silencing all background noise)
+          SITES=$(Rscript --vanilla -e '
+            msg_sink <- tempfile()
+            f <- file(msg_sink, open = "wt")
+            sink(f, type = "message")
+            sink(f, type = "output")
+
+            if (!require("jsonlite", quietly = TRUE)) {
+              install.packages("jsonlite", repos="https://cloud.r-project.org", quiet = TRUE)
+            }
+            
             d <- read.csv("https://raw.githubusercontent.com/eco4cast/neon4cast-targets/main/NEON_Field_Site_Metadata_20220412.csv")
-            cat(jsonlite::toJSON(d$field_site_id[d$terrestrial == 1]))
+            terrestrial_sites <- as.character(d$field_site_id[d$terrestrial == 1])
+            
+            sink(type = "output")
+            sink(type = "message")
+            cat(jsonlite::toJSON(terrestrial_sites))
           ')
+          
           echo "sites=$SITES" >> $GITHUB_OUTPUT
 
   process-site:
@@ -46,14 +62,18 @@ jobs:
       fail-fast: false
       matrix:
         site: ${{ fromJson(needs.determine-sites.outputs.sites) }}
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
-      - uses: r-lib/actions/setup-r@v2
-      
-      - name: Install System Dependencies
-        run: sudo apt-get update && sudo apt-get install -y libgdal-dev libproj-dev libgeos-dev
 
-      - name: Cache R Packages
+      - uses: r-lib/actions/setup-r@v2
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgdal-dev libproj-dev libgeos-dev
+
+      - name: Cache R packages
         uses: actions/cache@v3
         with:
           path: ~/.local/share/renv
@@ -61,48 +81,70 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-renv-
 
-      - name: Restore and Run
+      - name: Restore R packages and Run
         env:
           GITHUB_PAT: ${{ secrets.PAT_TOKEN }}
         run: |
           Rscript -e '
+            install.packages("renv", repos="https://cloud.r-project.org")
             source("renv/activate.R")
             renv::restore(packages = c("tidyverse", "neonUtilities","neonSoilFlux"), prompt = FALSE)
+            
+            args <- commandArgs(trailingOnly = TRUE)
             source("scripts/process_single_site.R")
-          ' --args "${{ matrix.site }}" "${{ needs.determine-sites.outputs.month }}"
+          ' "${{ matrix.site }}" "${{ needs.determine-sites.outputs.month }}"
 
-      - name: Upload
+      - name: Upload site artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: site-${{ matrix.site }}
-          # Path uses wildcards to catch exactly what we need
-          path: data/*/neon/*-${{ matrix.site }}-*.csv
+          path: |
+            data/drivers/neon/soil_drivers-${{ matrix.site }}-${{ needs.determine-sites.outputs.month }}.csv
+            data/targets/neon/forecast_prediction-${{ matrix.site }}-${{ needs.determine-sites.outputs.month }}.csv
+          if-no-files-found: ignore
 
   reduce:
     needs: [determine-sites, process-site]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: r-lib/actions/setup-r@v2
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgdal-dev libproj-dev libgeos-dev
 
       - name: Download all site artifacts
         uses: actions/download-artifact@v4
         with:
           pattern: "site-*"
-          path: merged_data
+          path: merged_outputs
           merge-multiple: true
 
-      - name: Combine and Commit
+      - name: Combine outputs
         run: |
-          # Move files from the flat download folder to the expected R structure
+          # Reconstruct directory structure for the R script
           mkdir -p data/drivers/neon data/targets/neon
-          mv merged_data/soil_drivers-*.csv data/drivers/neon/ 2>/dev/null || true
-          mv merged_data/forecast_prediction-*.csv data/targets/neon/ 2>/dev/null || true
+          cp merged_outputs/soil_drivers-*.csv data/drivers/neon/ 2>/dev/null || true
+          cp merged_outputs/forecast_prediction-*.csv data/targets/neon/ 2>/dev/null || true
           
           MONTH="${{ needs.determine-sites.outputs.month }}"
           Rscript scripts/combine_month.R "$MONTH"
-          
+
+      - name: Commit combined results
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+        run: |
           git config --global user.email "zobitz@augsburg.edu"
           git config --global user.name "jmzobitz"
           git add data/
-          git diff --quiet && git diff --staged --quiet || (git commit -m "Monthly update $MONTH" && git push)
+          # Only commit if there are actual changes
+          if [ -n "$(git status --porcelain)" ]; then
+            git commit -m "Monthly update for ${{ needs.determine-sites.outputs.month }}"
+            git push origin main
+          else
+            echo "No changes to commit."
+          fi
