@@ -1,4 +1,4 @@
-name: NEON Monthly Update (Dynamic Parallel)
+name: NEON Monthly Update (Parallel)
 
 on:
   workflow_dispatch:
@@ -16,7 +16,7 @@ jobs:
   determine-sites:
     runs-on: ubuntu-latest
     outputs:
-      sites: ${{ steps.set_sites.outputs.sites }}
+      sites: ${{ steps.get_sites.outputs.sites }}
       month: ${{ steps.determine_month.outputs.month }}
     steps:
       - uses: actions/checkout@v3
@@ -52,30 +52,30 @@ jobs:
         id: get_sites
         shell: bash
         run: |
-          # Use Rscript to read site CSV and get terrestrial sites
+          # Get sites as space-separated string from R
           SITES=$(Rscript --vanilla --quiet -e '
             source("renv/activate.R")
             library(tidyverse)
-
             d <- readr::read_csv(
               "https://raw.githubusercontent.com/eco4cast/neon4cast-targets/main/NEON_Field_Site_Metadata_20220412.csv",
               show_col_types = FALSE
             )
-
             terrestrial_sites <- d$field_site_id[d$terrestrial == 1]
             cat(paste(terrestrial_sites, collapse=" "))
           ')
 
-          # Remove extra whitespace
+          # Trim whitespace
           SITES=$(echo "$SITES" | tr -s ' ' | sed 's/^ *//;s/ *$//')
 
-          # Output sites for matrix (space-separated)
-          echo "sites=$SITES" >> $GITHUB_OUTPUT
+          # Convert to JSON array directly for matrix
+          SITES_JSON="["
+          for s in $SITES; do
+            SITES_JSON="$SITES_JSON\"$s\","
+          done
+          SITES_JSON="${SITES_JSON%,}]"  # remove trailing comma
 
-      - name: Set matrix output
-        id: set_sites
-        run: |
-          echo "sites=${{ steps.get_sites.outputs.sites }}" >> $GITHUB_OUTPUT
+          # Emit for matrix
+          echo "sites=$SITES_JSON" >> $GITHUB_OUTPUT
 
   process-site:
     needs: determine-sites
@@ -83,7 +83,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        site: ${{ fromJSON('["' + join('","', needs.determine-sites.outputs.sites.split(' ')) + '"]') }}
+        site: ${{ fromJson(needs.determine-sites.outputs.sites) }}
     continue-on-error: true
     steps:
       - uses: actions/checkout@v3
