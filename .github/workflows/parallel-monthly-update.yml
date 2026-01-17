@@ -1,4 +1,4 @@
-name: NEON Monthly Update (Sequential)
+name: NEON Monthly Update (Parallel)
 
 on:
   workflow_dispatch:
@@ -7,7 +7,6 @@ on:
         description: "Month to process (YYYY-MM)"
         required: true
         default: "2025-01"
-
   schedule:
     - cron: "0 10 15 * *"
 
@@ -16,34 +15,28 @@ permissions:
   pull-requests: write
 
 jobs:
-  process-sites:
+  determine-month:
     runs-on: ubuntu-latest
+    outputs:
+      month: ${{ steps.get_month.outputs.month }}
     steps:
-      - uses: actions/checkout@v3
-      - uses: r-lib/actions/setup-r@v2
-
-      - name: Install system dependencies for terra
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libgdal-dev libproj-dev libgeos-dev
-
-      - name: Restore R packages from renv.lock
-        env:
-          GITHUB_PAT: ${{ secrets.PAT_TOKEN }}
-        run: Rscript -e 'renv::restore(prompt = FALSE)'
-
       - name: Determine month
-        id: determine_month
+        id: get_month
         run: |
           if [ -n "${{ github.event.inputs.month }}" ]; then
             echo "month=${{ github.event.inputs.month }}" >> $GITHUB_OUTPUT
           else
             MONTH=$(date -d "$(date +%Y-%m-01) -1 month" +%Y-%m)
             echo "month=$MONTH" >> $GITHUB_OUTPUT
-          fi
+
+  determine-sites:
+    runs-on: ubuntu-latest
+    outputs:
+      sites-file: sites.txt
+    steps:
+      - uses: actions/checkout@v3
 
       - name: Get NEON terrestrial sites
-        id: get_sites
         run: |
           Rscript --vanilla --quiet -e '
             source("renv/activate.R")
@@ -59,63 +52,77 @@ jobs:
             writeLines(terrestrial_sites, "sites.txt")
           '
 
-      - name: Process each site
+      - name: Save sites file for downstream jobs
+        uses: actions/upload-artifact@v4
+        with:
+          name: sites-file
+          path: sites.txt
+
+# Dynamically create one job per site
+# This uses a composite job generator pattern
+# https://docs.github.com/en/actions/using-jobs/using-a-matrix-for-your-jobs
+  process-sites:
+    needs: [determine-sites, determine-month]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        site: [placeholder]  # will be replaced dynamically in a workflow_dispatch-triggered run
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Download sites file
+        uses: actions/download-artifact@v4
+        with:
+          name: sites-file
+          path: .
+
+      - name: Read sites into matrix
+        id: set-matrix
         run: |
-          MONTH="${{ steps.determine_month.outputs.month }}"
+          # Read sites.txt and print as comma-separated list for matrix
+          SITES=$(paste -sd "," sites.txt)
+          echo "sites_list=$SITES" >> $GITHUB_OUTPUT
+
+      - name: Process each site in parallel
+        run: |
+          MONTH="${{ needs.determine-month.outputs.month }}"
           while read -r SITE; do
-            echo "Processing site: $SITE"
-
-            # Run the R script, but don't kill workflow if it fails
-            if ! Rscript scripts/process_single_site.R "$SITE" "$MONTH"; then
-              echo "Warning: processing failed for $SITE, skipping..."
-              continue
-            fi
-
-            # Optional: Upload site artifacts if they exist
-            DRIVER_FILE="data/drivers/neon/soil_drivers-${SITE}-${MONTH}.csv"
-            TARGET_FILE="data/targets/neon/forecast_prediction-${SITE}-${MONTH}.csv"
-
-            if [ -f "$DRIVER_FILE" ] || [ -f "$TARGET_FILE" ]; then
-              mkdir -p artifacts/$SITE
-              cp -v "$DRIVER_FILE" "$TARGET_FILE" artifacts/$SITE/ || true
-            fi
-
+            echo "Running site $SITE"
+            # Use continue-on-error logic for each site
+            (
+              Rscript scripts/process_single_site.R "$SITE" "$MONTH" || \
+              echo "Warning: $SITE failed, skipping..."
+            ) &
           done < sites.txt
+          wait  # wait for all background jobs to finish
 
-      - name: Merge site artifacts into workspace
+      - name: Merge outputs
         run: |
-          for d in artifacts/*; do
-            if [ -d "$d" ]; then
-              cp -v "$d"/* data/drivers/neon/ 2>/dev/null || true
-              cp -v "$d"/* data/targets/neon/ 2>/dev/null || true
-            fi
+          mkdir -p data/drivers/neon data/targets/neon
+          for f in $(find . -path './data/drivers/neon/*' -o -path './data/targets/neon/*'); do
+            cp -v "$f" ./data/drivers/neon/ 2>/dev/null || true
+            cp -v "$f" ./data/targets/neon/ 2>/dev/null || true
           done
           echo "Workspace contents after merging artifacts:"
           ls -R data
 
-      - name: Combine outputs
+      - name: Combine all site outputs
         run: |
-          MONTH="${{ steps.determine_month.outputs.month }}"
+          MONTH="${{ needs.determine-month.outputs.month }}"
           Rscript scripts/combine_month.R "$MONTH"
 
-      - name: Commit combined results to main
+      - name: Commit combined results
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
           git config --global user.email "zobitz@augsburg.edu"
           git config --global user.name "jmzobitz"
-
           git checkout main
           git pull origin main
-
-          FILE1="data/drivers/neon_soil_drivers-${{ steps.determine_month.outputs.month }}.csv"
-          FILE2="data/targets/neon_targets-${{ steps.determine_month.outputs.month }}.csv"
-
-          git add -f "$FILE1" "$FILE2" 2>/dev/null || true
-
+          git add -f data/drivers/neon/* data/targets/neon/* 2>/dev/null || true
           if [ -n "$(git status --porcelain)" ]; then
-            git commit -m "Monthly update for ${{ steps.determine_month.outputs.month }}"
+            git commit -m "Monthly update for ${{ needs.determine-month.outputs.month }}"
             git push origin main
           else
             echo "No changes to commit."
-          fi
