@@ -38,6 +38,7 @@ jobs:
         id: get_sites
         shell: bash
         run: |
+          # Generate compact JSON from R
           JSON=$(Rscript --vanilla --quiet -e '
             source("renv/activate.R")
             library(tidyverse)
@@ -50,11 +51,13 @@ jobs:
 
             terrestrial_sites <- d |> filter(terrestrial == 1) |> pull(field_site_id)
 
-            # Output compact JSON
             cat(jsonlite::toJSON(terrestrial_sites, auto_unbox = TRUE, pretty = FALSE))
           ')
 
-          # Base64-encode JSON for safe output
+          # Trim whitespace and newlines
+          JSON=$(echo -n "$JSON" | tr -d '\r\n' | sed 's/^[ \t]*//;s/[ \t]*$//')
+
+          # Base64 encode JSON
           ENCODED=$(echo -n "$JSON" | base64 -w 0)
 
           # Heredoc-safe output
@@ -75,8 +78,10 @@ jobs:
         shell: bash
         run: |
           JSON=$(echo "${{ needs.determine-sites.outputs.sites }}" | base64 --decode)
+          # Trim whitespace and newlines
+          JSON=$(echo -n "$JSON" | tr -d '\r\n' | sed 's/^[ \t]*//;s/[ \t]*$//')
 
-          # Heredoc-safe output
+          # Heredoc-safe output for matrix
           {
             echo "sites_decoded<<EOF"
             echo "$JSON"
@@ -129,9 +134,6 @@ jobs:
           Rscript scripts/process_single_site.R \
             "${{ matrix.site }}" \
             "${{ steps.determine_month.outputs.month }}"
-
-      - name: List files for debugging
-        run: ls -R data/drivers/neon data/targets/neon || true
 
       - name: Upload site artifacts
         if: always()
