@@ -1,4 +1,4 @@
-name: NEON Monthly Update (Dynamic & Parallel)
+name: NEON Monthly Update (Dynamic Parallel)
 
 on:
   workflow_dispatch:
@@ -13,13 +13,30 @@ permissions:
   pull-requests: write
 
 jobs:
-  generate-matrix:
+  determine-sites:
     runs-on: ubuntu-latest
     outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
-      month: ${{ steps.get_month.outputs.month }}
+      sites: ${{ steps.set_sites.outputs.sites }}
+      month: ${{ steps.determine_month.outputs.month }}
     steps:
       - uses: actions/checkout@v3
+
+      - uses: r-lib/actions/setup-r@v2
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgdal-dev libproj-dev libgeos-dev
+
+      - name: Restore R packages
+        env:
+          GITHUB_PAT: ${{ secrets.PAT_TOKEN }}
+        run: |
+          Rscript -e '
+            install.packages("renv", repos="https://cloud.r-project.org")
+            source("renv/activate.R")
+            renv::restore(prompt = FALSE)
+          '
 
       - name: Determine month
         id: determine_month
@@ -31,11 +48,12 @@ jobs:
           fi
           echo "month=$MONTH" >> $GITHUB_OUTPUT
 
-
       - name: Get NEON terrestrial sites
         id: get_sites
+        shell: bash
         run: |
-          Rscript --vanilla --quiet -e '
+          # Use Rscript to read site CSV and get terrestrial sites
+          SITES=$(Rscript --vanilla --quiet -e '
             source("renv/activate.R")
             library(tidyverse)
 
@@ -45,25 +63,27 @@ jobs:
             )
 
             terrestrial_sites <- d$field_site_id[d$terrestrial == 1]
+            cat(paste(terrestrial_sites, collapse=" "))
+          ')
 
-            # Convert to JSON array string for matrix
-            json <- jsonlite::toJSON(terrestrial_sites, auto_unbox = TRUE)
-            writeLines(json, "sites.json")
-          '
+          # Remove extra whitespace
+          SITES=$(echo "$SITES" | tr -s ' ' | sed 's/^ *//;s/ *$//')
+
+          # Output sites for matrix (space-separated)
+          echo "sites=$SITES" >> $GITHUB_OUTPUT
 
       - name: Set matrix output
-        id: set-matrix
+        id: set_sites
         run: |
-          MATRIX=$(cat sites.json)
-          echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
+          echo "sites=${{ steps.get_sites.outputs.sites }}" >> $GITHUB_OUTPUT
 
   process-site:
-    needs: generate-matrix
+    needs: determine-sites
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        site: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
+        site: ${{ fromJSON('["' + join('","', needs.determine-sites.outputs.sites.split(' ')) + '"]') }}
     continue-on-error: true
     steps:
       - uses: actions/checkout@v3
@@ -88,8 +108,9 @@ jobs:
           '
 
       - name: Run single-site processing
+        shell: bash
         run: |
-          MONTH="${{ needs.generate-matrix.outputs.month }}"
+          MONTH="${{ needs.determine-sites.outputs.month }}"
           SITE="${{ matrix.site }}"
           echo "Processing site $SITE for month $MONTH"
           if ! Rscript scripts/process_single_site.R "$SITE" "$MONTH"; then
@@ -102,8 +123,8 @@ jobs:
         with:
           name: site-${{ matrix.site }}
           path: |
-            data/drivers/neon/soil_drivers-${{ matrix.site }}-${{ needs.generate-matrix.outputs.month }}.csv
-            data/targets/neon/forecast_prediction-${{ matrix.site }}-${{ needs.generate-matrix.outputs.month }}.csv
+            data/drivers/neon/soil_drivers-${{ matrix.site }}-${{ needs.determine-sites.outputs.month }}.csv
+            data/targets/neon/forecast_prediction-${{ matrix.site }}-${{ needs.determine-sites.outputs.month }}.csv
 
   reduce:
     needs: process-site
@@ -117,7 +138,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libgdal-dev libproj-dev libgeos-dev
 
-      - name: Restore only needed R packages
+      - name: Restore R packages
         env:
           GITHUB_PAT: ${{ secrets.PAT_TOKEN }}
         run: |
@@ -147,7 +168,7 @@ jobs:
 
       - name: Combine outputs
         run: |
-          MONTH="${{ needs.generate-matrix.outputs.month }}"
+          MONTH="${{ needs.determine-sites.outputs.month }}"
           Rscript scripts/combine_month.R "$MONTH"
 
       - name: Commit combined results
