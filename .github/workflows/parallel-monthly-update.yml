@@ -22,13 +22,15 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Determine month
-        id: get_month
+        id: determine_month
+        shell: bash
         run: |
-          if [ -n "${{ github.event.inputs.month }}" ]; then
-            echo "month=${{ github.event.inputs.month }}" >> $GITHUB_OUTPUT
-          else
+          MONTH="${{ github.event.inputs.month }}"
+          if [ -z "$MONTH" ]; then
             MONTH=$(date -d "$(date +%Y-%m-01) -1 month" +%Y-%m)
-            echo "month=$MONTH" >> $GITHUB_OUTPUT
+          fi
+          echo "month=$MONTH" >> $GITHUB_OUTPUT
+
 
       - name: Get NEON terrestrial sites
         id: get_sites
