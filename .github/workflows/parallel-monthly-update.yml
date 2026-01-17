@@ -54,6 +54,10 @@ jobs:
             cat(jsonlite::toJSON(terrestrial_sites, auto_unbox = TRUE))
           ')
           
+          # TRIM WHITESPACE → absolutely required for fromJson()
+          SITES=$(echo "$SITES" | tr -d '\n' | tr -d '\r' | sed 's/^[ \t]*//;s/[ \t]*$//')
+
+          
           {
             echo "sites<<EOF"
             echo "$SITES"
