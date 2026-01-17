@@ -50,12 +50,19 @@ jobs:
 
             terrestrial_sites <- d |> filter(terrestrial == 1) |> pull(field_site_id)
 
+            # Output compact JSON
             cat(jsonlite::toJSON(terrestrial_sites, auto_unbox = TRUE, pretty = FALSE))
           ')
 
-          # Encode JSON for safe GitHub Actions output
+          # Base64-encode JSON for safe output
           ENCODED=$(echo -n "$JSON" | base64 -w 0)
-          echo "sites=$ENCODED" >> "$GITHUB_OUTPUT"
+
+          # Heredoc-safe output
+          {
+            echo "sites<<EOF"
+            echo "$ENCODED"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
   decode-sites:
     needs: determine-sites
@@ -68,7 +75,13 @@ jobs:
         shell: bash
         run: |
           JSON=$(echo "${{ needs.determine-sites.outputs.sites }}" | base64 --decode)
-          echo "sites_decoded=$JSON" >> "$GITHUB_OUTPUT"
+
+          # Heredoc-safe output
+          {
+            echo "sites_decoded<<EOF"
+            echo "$JSON"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
   process-site:
     needs: decode-sites
@@ -87,7 +100,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libgdal-dev libproj-dev libgeos-dev
 
-      - name: Restore R packages needed for processing
+      - name: Restore required R packages
         env:
           GITHUB_PAT: ${{ secrets.PAT_TOKEN }}
         run: |
