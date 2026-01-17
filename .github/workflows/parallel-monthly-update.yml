@@ -1,4 +1,4 @@
-name: NEON Monthly Update (Parallel)
+name: NEON Monthly Update (Dynamic & Parallel)
 
 on:
   workflow_dispatch:
@@ -7,19 +7,20 @@ on:
         description: "Month to process (YYYY-MM)"
         required: true
         default: "2025-01"
-  schedule:
-    - cron: "0 10 15 * *"
 
 permissions:
   contents: write
   pull-requests: write
 
 jobs:
-  determine-month:
+  generate-matrix:
     runs-on: ubuntu-latest
     outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
       month: ${{ steps.get_month.outputs.month }}
     steps:
+      - uses: actions/checkout@v3
+
       - name: Determine month
         id: get_month
         run: |
@@ -29,14 +30,8 @@ jobs:
             MONTH=$(date -d "$(date +%Y-%m-01) -1 month" +%Y-%m)
             echo "month=$MONTH" >> $GITHUB_OUTPUT
 
-  determine-sites:
-    runs-on: ubuntu-latest
-    outputs:
-      sites-file: sites.txt
-    steps:
-      - uses: actions/checkout@v3
-
       - name: Get NEON terrestrial sites
+        id: get_sites
         run: |
           Rscript --vanilla --quiet -e '
             source("renv/activate.R")
@@ -49,67 +44,108 @@ jobs:
 
             terrestrial_sites <- d$field_site_id[d$terrestrial == 1]
 
-            writeLines(terrestrial_sites, "sites.txt")
+            # Convert to JSON array string for matrix
+            json <- jsonlite::toJSON(terrestrial_sites, auto_unbox = TRUE)
+            writeLines(json, "sites.json")
           '
 
-      - name: Save sites file for downstream jobs
-        uses: actions/upload-artifact@v4
-        with:
-          name: sites-file
-          path: sites.txt
+      - name: Set matrix output
+        id: set-matrix
+        run: |
+          MATRIX=$(cat sites.json)
+          echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
 
-# Dynamically create one job per site
-# This uses a composite job generator pattern
-# https://docs.github.com/en/actions/using-jobs/using-a-matrix-for-your-jobs
-  process-sites:
-    needs: [determine-sites, determine-month]
+  process-site:
+    needs: generate-matrix
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        site: [placeholder]  # will be replaced dynamically in a workflow_dispatch-triggered run
+        site: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v3
+      - uses: r-lib/actions/setup-r@v2
 
-      - name: Download sites file
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgdal-dev libproj-dev libgeos-dev
+
+      - name: Restore R packages
+        env:
+          GITHUB_PAT: ${{ secrets.PAT_TOKEN }}
+        run: |
+          Rscript -e '
+            install.packages("renv", repos="https://cloud.r-project.org")
+            source("renv/activate.R")
+            renv::restore(
+              packages = c("tidyverse", "neonUtilities","neonSoilFlux"),
+              prompt = FALSE
+            )
+          '
+
+      - name: Run single-site processing
+        run: |
+          MONTH="${{ needs.generate-matrix.outputs.month }}"
+          SITE="${{ matrix.site }}"
+          echo "Processing site $SITE for month $MONTH"
+          if ! Rscript scripts/process_single_site.R "$SITE" "$MONTH"; then
+            echo "Warning: $SITE failed or has no output, skipping..."
+          fi
+
+      - name: Upload site artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: site-${{ matrix.site }}
+          path: |
+            data/drivers/neon/soil_drivers-${{ matrix.site }}-${{ needs.generate-matrix.outputs.month }}.csv
+            data/targets/neon/forecast_prediction-${{ matrix.site }}-${{ needs.generate-matrix.outputs.month }}.csv
+
+  reduce:
+    needs: process-site
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: r-lib/actions/setup-r@v2
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgdal-dev libproj-dev libgeos-dev
+
+      - name: Restore only needed R packages
+        env:
+          GITHUB_PAT: ${{ secrets.PAT_TOKEN }}
+        run: |
+          Rscript -e '
+            install.packages("renv", repos="https://cloud.r-project.org")
+            source("renv/activate.R")
+            renv::restore(
+              packages = c("tidyverse"),
+              prompt = FALSE
+            )
+          '
+
+      - name: Download all site artifacts
         uses: actions/download-artifact@v4
         with:
-          name: sites-file
+          pattern: "site-*"
           path: .
+          merge-multiple: true
 
-      - name: Read sites into matrix
-        id: set-matrix
-        run: |
-          # Read sites.txt and print as comma-separated list for matrix
-          SITES=$(paste -sd "," sites.txt)
-          echo "sites_list=$SITES" >> $GITHUB_OUTPUT
-
-      - name: Process each site in parallel
-        run: |
-          MONTH="${{ needs.determine-month.outputs.month }}"
-          while read -r SITE; do
-            echo "Running site $SITE"
-            # Use continue-on-error logic for each site
-            (
-              Rscript scripts/process_single_site.R "$SITE" "$MONTH" || \
-              echo "Warning: $SITE failed, skipping..."
-            ) &
-          done < sites.txt
-          wait  # wait for all background jobs to finish
-
-      - name: Merge outputs
+      - name: Copy artifacts into final workspace
         run: |
           mkdir -p data/drivers/neon data/targets/neon
-          for f in $(find . -path './data/drivers/neon/*' -o -path './data/targets/neon/*'); do
-            cp -v "$f" ./data/drivers/neon/ 2>/dev/null || true
-            cp -v "$f" ./data/targets/neon/ 2>/dev/null || true
-          done
+          find . -type f -path "*/data/drivers/neon/*" -exec cp -v {} data/drivers/neon/ \; || true
+          find . -type f -path "*/data/targets/neon/*" -exec cp -v {} data/targets/neon/ \; || true
           echo "Workspace contents after merging artifacts:"
           ls -R data
 
-      - name: Combine all site outputs
+      - name: Combine outputs
         run: |
-          MONTH="${{ needs.determine-month.outputs.month }}"
+          MONTH="${{ needs.generate-matrix.outputs.month }}"
           Rscript scripts/combine_month.R "$MONTH"
 
       - name: Commit combined results
@@ -122,7 +158,7 @@ jobs:
           git pull origin main
           git add -f data/drivers/neon/* data/targets/neon/* 2>/dev/null || true
           if [ -n "$(git status --porcelain)" ]; then
-            git commit -m "Monthly update for ${{ needs.determine-month.outputs.month }}"
+            git commit -m "Monthly update for $MONTH"
             git push origin main
           else
             echo "No changes to commit."
