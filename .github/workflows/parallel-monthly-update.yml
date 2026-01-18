@@ -117,6 +117,28 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libgdal-dev libproj-dev libgeos-dev
 
+      - name: Cache R packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.local/share/renv
+          key: ${{ runner.os }}-renv-${{ hashFiles('**/renv.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-renv-
+
+      - name: Restore R packages and Run
+        env:
+          GITHUB_PAT: ${{ secrets.PAT_TOKEN }}
+        run: |
+          Rscript -e '
+            install.packages("renv", repos="https://cloud.r-project.org")
+            source("renv/activate.R")
+            renv::restore(packages = c("tidyverse", "neonUtilities","neonSoilFlux"), prompt = FALSE)
+            
+            args <- commandArgs(trailingOnly = TRUE)
+            source("scripts/process_single_site.R")
+          ' "${{ matrix.site }}" "${{ needs.determine-sites.outputs.month }}"
+
+
       - name: Download all site artifacts
         uses: actions/download-artifact@v4
         with:
