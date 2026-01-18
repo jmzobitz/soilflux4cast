@@ -8,6 +8,9 @@ on:
         required: true
         default: "2025-01"
 
+  schedule:
+    - cron: "0 10 19 * *"
+    
 permissions:
   contents: write
   pull-requests: write
