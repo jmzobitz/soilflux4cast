@@ -7,6 +7,10 @@ on:
         description: "Month to process (YYYY-MM)"
         required: true
         default: "2025-01"
+      test_site:
+        description: "Testing: Enter a single site ID (e.g., BART) to run only one site. Leave blank for all."
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -34,19 +38,27 @@ jobs:
           MONTH=${USER_MONTH:-$(date -d "$(date +%Y-%m-01) -1 month" +%Y-%m)}
           echo "month=$MONTH" >> $GITHUB_OUTPUT
 
-          # 2. Get Sites as JSON (Silencing all background noise)
+          # 2. Get Sites as JSON
           SITES=$(Rscript --vanilla -e '
             msg_sink <- tempfile()
             f <- file(msg_sink, open = "wt")
             sink(f, type = "message")
             sink(f, type = "output")
 
-            if (!require("jsonlite", quietly = TRUE)) {
-              install.packages("jsonlite", repos="https://cloud.r-project.org", quiet = TRUE)
+            # Check if user provided a single test site
+            test_site <- "${{ github.event.inputs.test_site }}"
+
+            if (test_site != "") {
+                # If test_site is provided, just use that one
+                terrestrial_sites <- test_site
+            } else {
+                # Otherwise, fetch all terrestrial sites
+                if (!require("jsonlite", quietly = TRUE)) {
+                  install.packages("jsonlite", repos="https://cloud.r-project.org", quiet = TRUE)
+                }
+                d <- read.csv("https://raw.githubusercontent.com/eco4cast/neon4cast-targets/main/NEON_Field_Site_Metadata_20220412.csv")
+                terrestrial_sites <- as.character(d$field_site_id[d$terrestrial == 1])
             }
-            
-            d <- read.csv("https://raw.githubusercontent.com/eco4cast/neon4cast-targets/main/NEON_Field_Site_Metadata_20220412.csv")
-            terrestrial_sites <- as.character(d$field_site_id[d$terrestrial == 1])
             
             sink(type = "output")
             sink(type = "message")
@@ -65,7 +77,6 @@ jobs:
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
-
       - uses: r-lib/actions/setup-r@v2
 
       - name: Install system dependencies
@@ -109,35 +120,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: r-lib/actions/setup-r@v2
 
       - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libgdal-dev libproj-dev libgeos-dev
-
-      - name: Cache R packages
-        uses: actions/cache@v3
-        with:
-          path: ~/.local/share/renv
-          key: ${{ runner.os }}-renv-${{ hashFiles('**/renv.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-renv-
-
-      - name: Restore R packages and Run
-        env:
-          GITHUB_PAT: ${{ secrets.PAT_TOKEN }}
-        run: |
-          Rscript -e '
-            install.packages("renv", repos="https://cloud.r-project.org")
-            source("renv/activate.R")
-            renv::restore(packages = c("tidyverse", "neonUtilities","neonSoilFlux"), prompt = FALSE)
-            
-            args <- commandArgs(trailingOnly = TRUE)
-            source("scripts/process_single_site.R")
-          ' "${{ matrix.site }}" "${{ needs.determine-sites.outputs.month }}"
-
 
       - name: Download all site artifacts
         uses: actions/download-artifact@v4
@@ -148,7 +136,6 @@ jobs:
 
       - name: Combine outputs
         run: |
-          # Reconstruct directory structure for the R script
           mkdir -p data/drivers/neon data/targets/neon
           cp merged_outputs/soil_drivers-*.csv data/drivers/neon/ 2>/dev/null || true
           cp merged_outputs/forecast_prediction-*.csv data/targets/neon/ 2>/dev/null || true
@@ -162,8 +149,7 @@ jobs:
         run: |
           git config --global user.email "zobitz@augsburg.edu"
           git config --global user.name "jmzobitz"
-          git add data/
-          # Only commit if there are actual changes
+          git add -f data/
           if [ -n "$(git status --porcelain)" ]; then
             git commit -m "Monthly update for ${{ needs.determine-sites.outputs.month }}"
             git push origin main
