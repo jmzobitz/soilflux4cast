@@ -9,7 +9,7 @@ on:
         default: "2025-01"
 
   schedule:
-    - cron: "0 10 19 * *"
+    - cron: "0 10 15 * *"
     
 permissions:
   contents: write
