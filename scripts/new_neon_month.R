@@ -14,10 +14,86 @@ curr_month <- as.character(args[1])
 library(neonSoilFlux)
 library(tidyverse)
 library(neonUtilities)
+library(zoo) ### Computing means
 
 
-### Input will be a month that we provide in YYYY-MM format as a string
+### Define some auxiliary functions
+weighted_mean_sd <- function(input_compute) {
+### Purpose: this function computes the weighted mean of flux and flux_err.
+# set default vals
+out_val <- tibble(mean = NA,err = NA)
 
+# Combine these as a data table, remove NA for each measurement pair
+input <- input_compute |>
+  select(flux,flux_err) |>
+  drop_na()
+
+if(nrow(input > 0)) {
+  
+  weights <- 1/(input$flux_err)^2
+  vals <- input$flux
+  
+  mean <- sum(weights*vals)/sum(weights)
+  err <- sqrt(1/sum(weights))
+  
+  out_val <- tibble(mean,err)
+}
+
+return(out_val)
+
+}
+
+
+flux_daily_agg <- function(input_fluxes) {
+  ## The input is a nested data table at each location and halfhour.  We need to average across the methods and sites.
+  
+  # Globbed from bigleaf R package scripts
+  # https://www.swissfluxnet.ethz.ch/index.php/documentation/conversion-sequences/
+  # Go to umol CO2 m-2 s-1 → g C m-2 30min-1
+  # molar mass of carbon (kg mol-1) = 0.012011
+  # conversion micromole (umol) to mole (mol) = 1e-06
+  # conversion kilogram (kg) to gram (g) = 1000
+  # seconds per half hour = 1800
+  
+  conv <- 0.02161926
+  
+  # First compute the average across all flux methods at the startDateTime and the horizontalPosition
+  
+  avg_by_time_hor <- input_fluxes |> 
+    mutate(flux = map(.x=flux_compute,.f=~weighted_mean_sd(.x)) ) |> 
+    select(startDateTime,horizontalPosition,flux) |>
+    unnest(cols=c(flux)) |>
+    ungroup() |>
+    rename(flux = mean,
+           flux_err = err)
+  
+  
+  ### Next Group by start date time
+  avg_by_time <- avg_by_time_hor |>
+    group_by(startDateTime) |>
+    nest() |>
+    mutate(flux = map(.x=data,.f=~weighted_mean_sd(.x)) ) |>
+    select(startDateTime,flux) |>
+    unnest(cols=c(flux)) |>
+    ungroup() |>
+    rename(flux = mean,
+           flux_err = err) |>
+    mutate(flux = zoo::na.approx(flux),  #Use zoo package to do linear interpolation for any NAs:
+           flux_err = zoo::na.approx(flux_err))
+  
+  
+  ### Now aggregate up to daily values
+  avg_day <- avg_by_time |>
+    mutate(day = floor_date(startDateTime,unit="day"),
+           flux = flux*conv,
+           flux_err = flux*conv) |>
+    group_by(day) |>
+    summarize(flux = sum(flux,na.rm=TRUE),
+              flux_err = sqrt(sum(flux_err^2,na.rm=TRUE))  # Standard flux propogation
+    )
+  
+  return(avg_day)
+}
 
 # Acquire the NEON site_data
 site_names <- readr::read_csv(paste0("https://raw.githubusercontent.com/eco4cast/neon4cast-targets/", "main/NEON_Field_Site_Metadata_20220412.csv"), show_col_types = FALSE) |>
@@ -25,13 +101,7 @@ site_names <- readr::read_csv(paste0("https://raw.githubusercontent.com/eco4cast
   dplyr::select(field_site_id, field_latitude, field_longitude) |>
   dplyr::rename(site_id = field_site_id)
 
-# Globbed from bigleaf R package scripts
-# molar mass of carbon (kg mol-1) = 0.012011
-# conversion micromole (umol) to mole (mol) = 1e-06
-# conversion kilogram (kg) to gram (g) = 1000
-# seconds per half hour = 1800
 
-conv <- 1e-6 * 0.012011 * 1000 * 1800
 
 for(i in 1:nrow(site_names)) {
   # Process
@@ -88,28 +158,16 @@ for(i in 1:nrow(site_names)) {
       try(
         # NOTE: you will need to say y/n at several points here
         {
-          flux_full <- compute_neon_flux(
+          flux_input <- compute_neon_flux(
             input_site_env = out_env_data$site_data,
             input_site_megapit = out_env_data$site_megapit
-          ) |>
-            select(-surface_diffusivity) |>
-            unnest(cols = c(flux_compute)) |>
-            group_by(startDateTime) |>
-            mutate(flux =flux*conv,
-                   flux_err = flux_err*conv,
-            ) |>
-            summarize(flux_out = mean(flux,na.rm=TRUE),
-                      flux_err = sd(flux,na.rm=TRUE)/sqrt(sum(!is.na(flux)))
-                      
-            ) |>
-            rename(flux = flux_out) |>
-            group_by(startDateTime = floor_date(startDateTime,unit="day")) |>
-            summarize(flux = sum(flux,na.rm=TRUE),
-                      flux_err = sqrt(sum(flux_err^2,na.rm=TRUE))) |>
+          )
+            
+          flux_full <- flux_daily_agg(flux_input)
             ungroup() |>
             mutate(site_id = curr_site_name) |>
             relocate(site_id) |>
-            arrange(startDateTime)
+            rename(startDateTime = day)
 
 
 
