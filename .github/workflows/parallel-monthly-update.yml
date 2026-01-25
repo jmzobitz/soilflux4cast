@@ -91,7 +91,7 @@ jobs:
           Rscript -e '
             install.packages("renv", repos="https://cloud.r-project.org")
             source("renv/activate.R")
-            renv::restore(packages = c("tidyverse", "neonUtilities","neonSoilFlux"), prompt = FALSE)
+            renv::restore(packages = c("tidyverse", "neonUtilities","neonSoilFlux","zoo"), prompt = FALSE)
             
             args <- commandArgs(trailingOnly = TRUE)
             source("scripts/process_single_site.R")
@@ -135,7 +135,7 @@ jobs:
           Rscript -e '
             install.packages("renv", repos="https://cloud.r-project.org")
             source("renv/activate.R")
-            renv::restore(packages = c("tidyverse", "neonUtilities","neonSoilFlux"), prompt = FALSE)
+            renv::restore(packages = c("tidyverse", "neonUtilities","neonSoilFlux","zoo"), prompt = FALSE)
             
             args <- commandArgs(trailingOnly = TRUE)
             source("scripts/process_single_site.R")
