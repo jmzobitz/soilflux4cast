@@ -136,6 +136,7 @@ jobs:
             install.packages("renv", repos="https://cloud.r-project.org")
             source("renv/activate.R")
             renv::restore(packages = c("tidyverse", "neonUtilities","neonSoilFlux","zoo"), prompt = FALSE)
+            '
             
       - name: Download all site artifacts
         uses: actions/download-artifact@v4
