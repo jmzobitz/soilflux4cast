@@ -164,6 +164,15 @@ jobs:
           MONTH="${{ needs.determine-sites.outputs.month }}"
           Rscript scripts/combine_month.R "$MONTH"
 
+      - name: Debug merged outputs
+        run: |
+          echo "Contents of data/targets/neon:"
+          ls -l data/targets/neon || true
+
+          echo "Merged outputs directory:"
+          ls -l merged_outputs || true
+
+
       - name: Commit combined results
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
