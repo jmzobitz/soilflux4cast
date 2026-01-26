@@ -145,7 +145,7 @@ try({
   
   flux_full <- flux_daily_agg(flux_input) |>
     ungroup() |>
-    mutate(site_id = curr_site_name) |>
+    mutate(site_id = site_id) |>
     relocate(site_id) |>
     rename(startDateTime = day)
   
