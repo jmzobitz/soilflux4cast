@@ -107,7 +107,7 @@ jobs:
             data/targets/neon/forecast_prediction-${{ matrix.site }}-${{ needs.determine-sites.outputs.month }}.csv
           if-no-files-found: ignore
 
-    reduce:
+  reduce:
     needs: [determine-sites, process-site]
     runs-on: ubuntu-latest
     steps:
