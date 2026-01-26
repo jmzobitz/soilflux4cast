@@ -137,11 +137,6 @@ jobs:
             source("renv/activate.R")
             renv::restore(packages = c("tidyverse", "neonUtilities","neonSoilFlux","zoo"), prompt = FALSE)
             
-            args <- commandArgs(trailingOnly = TRUE)
-            source("scripts/process_single_site.R")
-          ' "${{ matrix.site }}" "${{ needs.determine-sites.outputs.month }}"
-
-
       - name: Download all site artifacts
         uses: actions/download-artifact@v4
         with:
