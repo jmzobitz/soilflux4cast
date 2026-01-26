@@ -132,11 +132,11 @@ jobs:
         env:
           GITHUB_PAT: ${{ secrets.PAT_TOKEN }}
         run: |
-          Rscript -e '
-            install.packages("renv", repos="https://cloud.r-project.org")
-            source("renv/activate.R")
-            renv::restore(packages = c("tidyverse", "neonUtilities","neonSoilFlux","zoo"), prompt = FALSE)
-            '
+          Rscript -e "
+            install.packages('renv', repos='https://cloud.r-project.org');
+            source('renv/activate.R');
+            renv::restore(packages = c('tidyverse','neonUtilities','neonSoilFlux','zoo'), prompt = FALSE);
+          "
             
       - name: Download all site artifacts
         uses: actions/download-artifact@v4
