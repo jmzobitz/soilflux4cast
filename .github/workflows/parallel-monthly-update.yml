@@ -161,8 +161,11 @@ jobs:
         run: |
           git config --global user.email "zobitz@augsburg.edu"
           git config --global user.name "jmzobitz"
+
+          git pull --rebase origin main
+
           git add -f data/
-          # Only commit if there are actual changes
+
           if [ -n "$(git status --porcelain)" ]; then
             git commit -m "Monthly update for ${{ needs.determine-sites.outputs.month }}"
             git push origin main
