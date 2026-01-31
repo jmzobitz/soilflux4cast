@@ -93,7 +93,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
-          FILE="data/outputs/forecast_prediction-${{ matrix.forecast_date }}.csv"
+          FILE="data/outputs/forecast_prediction_validation-${{ matrix.forecast_date }}.csv"
 
           if [ ! -f "$FILE" ]; then
             echo "No output for ${{ matrix.forecast_date }}"
