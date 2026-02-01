@@ -424,7 +424,7 @@ input_forecast_xg <- joined_vars_month  |>
   forecast_summarize_horizon(fx_date = forecast_date)
 
 
-forecast_file <- paste0('data/outputs/forecast_prediction_horizon-',forecast_date,'.csv')
+forecast_file <- paste0('data/outputs/horizon/forecast_prediction_horizon-',forecast_date,'.csv')
 
 # glob forecasts together - we assume that we average across the day
 input_forecast_horizon <- rbind(input_forecast_lm,
