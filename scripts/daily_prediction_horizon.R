@@ -8,6 +8,7 @@ library(xgboost)
 library(lubridate)
 library(tidyverse)
 library(broom)
+library(scoringRules)
 
 ### Source some functions
 source("R/download_values.R")
@@ -18,19 +19,41 @@ source('R/targets_available.R')
 ### Function that summarizes a forecast ensemble
 forecast_summarize_horizon <- function(input_forecast,fx_date) {
   
+  ### Get target data
+  fx_year <- str_split_fixed(fx_date, "-", 3)[1]
+  fx_month <- str_split_fixed(fx_date, "-", 3)[2]
+  targets <- download_values(variable = "targets",
+                             year = fx_year,
+                             month = fx_month)
+  
+  
   input_forecast |>
     mutate(day = floor_date(datetime,unit = "day")) |> 
     group_by(site_id,model,day) |>
-    dplyr::reframe(value =
-                     stats::quantile(value,na.rm=TRUE,probs = c(0.025,0.10,0.5,0.9,.975),
-                     ),
-                   name = c("q0.025", "q0.10","q0.5", "q0.90","q0.975"),
-                   mean = mean(value, na.rm = TRUE),
-                   sd = sd(value, na.rm = TRUE)
-    ) |> 
-    tidyr::pivot_wider() |>
+    nest() |>
+    inner_join(targets,by=c("site_id","day"="startDateTime")) |> 
+    mutate(horizon = as.numeric(day-as.POSIXct.Date(ymd(fx_date)),unit="days"),
+           crps = map2_dbl(.x=data,
+                           .y=flux,
+                           .f=~( if(sum(!is.na(.x$value)>0)) 
+                           {scoringRules::crps_sample(y=.y,dat=.x$value)}
+                           else(NA)
+                           )
+           ),
+           data = map(.x=data, .f=~(.x |> dplyr::reframe(value =
+                                                           stats::quantile(value,na.rm=TRUE,probs = c(0.025,0.10,0.5,0.9,.975),
+                                                           ),
+                                                         name = c("q0.025", "q0.10","q0.5", "q0.90","q0.975"),
+                                                         mean = mean(value, na.rm = TRUE),
+                                                         sd = sd(value, na.rm = TRUE)
+           ) |> 
+             tidyr::pivot_wider() ))
+    ) |>
+    select(-flux,-flux_err) |>
+    unnest(cols=c("data")) |>
     ungroup() |>
-    mutate(horizon = as.numeric(day-as.POSIXct.Date(ymd(fx_date)),unit="days"))
+    dplyr::relocate(site_id,model,day,horizon)
+  
   
 }
 
@@ -69,6 +92,8 @@ driver_data <- stage1 |>
 # Remove any temporary files
 terra::tmpFiles(remove = TRUE)
 unlink(list.files(tempdir(), full.names = TRUE), recursive = TRUE)
+
+
 
 
 ### STEP 2: determine the month and year for which we data to parameterize models (used for models 4 and 5)
