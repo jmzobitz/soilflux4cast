@@ -10,7 +10,7 @@ library(tidyverse)
 library(broom)
 
 ### Source some functions
-source("R/download_annual_values.R")
+source("R/download_values.R")
 source("R/fit_exp_soilR.R")
 source('R/drivers_available.R')
 source('R/targets_available.R')
@@ -203,8 +203,8 @@ input_forecast_lm <- driver_data |>
 
 ### Model 3c: Fit an exponential model to all data from the year before
 
-drivers <- download_annual_values("drivers",year_before)
-targets <- download_annual_values("targets",year_before)
+drivers <- download_values("drivers",year_before)
+targets <- download_values("targets",year_before)
 
 # now join by site and day
 
@@ -273,8 +273,8 @@ input_forecast_exp <- driver_data |>
 
 ## Models 3d and 3e: Get drivers and targets from the previous data drop
 
-drivers_month <- download_annual_values("drivers",curr_year,month = curr_month)
-targets_month <- download_annual_values("targets",curr_year,month = curr_month)
+drivers_month <- download_values("drivers",curr_year,month = curr_month)
+targets_month <- download_values("targets",curr_year,month = curr_month)
 # Acquire and download the model and
 
 joined_vars_month <- targets_month |>

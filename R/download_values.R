@@ -1,4 +1,4 @@
-#' download_annual_values Acquire the value across all NEON sites at a given date.
+#' download_values Acquire the value across all NEON sites at a given date.
 #'
 #' @param variable do we get targets or drivers?
 #' @param year year (as a string)
@@ -9,9 +9,9 @@
 #' @export
 #'
 #' @examples
-#' download_annual_values("drivers","2024")
+#' download_values("drivers","2024")
 
-download_annual_values <- function(variable = "drivers", year, month = NULL) {
+download_values <- function(variable = "drivers", year, month = NULL) {
   
   # Ensure character types
   year  <- as.character(year)
