@@ -30,9 +30,9 @@ library(ggthemes)
 
 **The learning outcomes of this activity are:**
 
--   Understand the dynamic environmental and biological properties affecting soil CO$_{2}$ efflux.
+-   Understand the dynamic environmental and biological properties affecting soil CO~2~ efflux.
 -   Apply Fick's Law of Diffusion to estimate of soil gas efflux.
--   Investigate a multi-year timeseries of soil water content, soil temperature, and soil gas efflux derived from Fick's Law to infer process-level changes in soil CO$_{2}$ efflux.
+-   Investigate a multi-year timeseries of soil water content, soil temperature, and soil gas efflux derived from Fick's Law to infer process-level changes in soil CO~2~ efflux.
 
 Module citation: @QUBES4774
 
@@ -62,7 +62,7 @@ F_{s} = - D_{a} \cdot f(T) \cdot g(W) \cdot \frac{dC}{dz},
 | The negative sign in Fick's Law makes $F_{s}$ a positive value, which means carbon is *leaving* the soil. The other terms are:
 
 -   $D_{a}$ is called the **diffusion coefficient** (units m$^{2}$ s$^{-1}$). Values of $D_{a}$ also includes considerations for soil density and air pressure.
--   $\displaystyle \frac{dC}{dz}$ is the (vertical) gradient in CO$_{2}$. We measure CO$_{2}$ in molar concentration (units $\mu$mol m$^{-3}$).
+-   $\displaystyle \frac{dC}{dz}$ is the (vertical) gradient in CO~2~. We measure CO~2~ in molar concentration (units $\mu$mol m$^{-3}$).
 -   The function $f(T)$ is a function that characterizes the temperature response $T$ (no units).
 -   The function $g(W)$ is a function that characterizes the response due to soil water content $W$ (no units).
 
@@ -220,26 +220,26 @@ ggplot() +
 
 ### Summarizing up
 
-Soil water $W$ and soil temperature $T$ are considered *environmental* factors affecting soil CO$_{2}$. *Biological* factors such as plant roots and soil microbes. Plant roots respire CO$_{2}$ respire CO$_{2}$ into the soil, called *autotrophic respiration*. Soil microbes may utilize soil carbon for growth, but also respire CO$_{2}$, called *heterotrophic respiration*.
+Soil water $W$ and soil temperature $T$ are considered *environmental* factors affecting soil CO~2~. *Biological* factors such as plant roots and soil microbes. Plant roots respire CO~2~ respire CO~2~ into the soil, called *autotrophic respiration*. Soil microbes may utilize soil carbon for growth, but also respire CO~2~, called *heterotrophic respiration*.
 
-16. In @tbl-summary indicate if the following factor increases or decreases soil CO$_{2}$ by making a check ($\checkmark$) for yes or $X$ for noin the appropriate column. **Complete the table on the response sheet.**
+16. In @tbl-summary indicate if the following factor increases or decreases soil CO~2~ by making a check ($\checkmark$) for yes or $X$ for noin the appropriate column. **Complete the table on the response sheet.**
 
-| Factor        | Increase soil CO$_{2}$ | Decrease soil CO$_{2}$ |
+| Factor        | Increase soil CO~2~ | Decrease soil CO~2~ |
 |---------------|------------------------|------------------------|
 | Temperature   |                        |                        |
 | Soil moisture |                        |                        |
 | Plant roots   |                        |                        |
 | Soil microbes |                        |                        |
 
-: Evaluation of different factors that influence soil CO$_{2}$. {#tbl-summary}
+: Evaluation of different factors that influence soil CO~2~. {#tbl-summary}
 
 ## Understanding and estimating concentration gradients
 
-The second term to calculate $F_{s}$ is $\displaystyle \frac{dC}{dz}$, which represents the gradient in CO$_{2}$ *at the soil surface*. This soil gradient is estimated $\displaystyle \frac{dC}{dz}$ using continuous CO$_{2}$ sensors buried in the soil.
+The second term to calculate $F_{s}$ is $\displaystyle \frac{dC}{dz}$, which represents the gradient in CO~2~ *at the soil surface*. This soil gradient is estimated $\displaystyle \frac{dC}{dz}$ using continuous CO~2~ sensors buried in the soil.
 
 @fig-co2 shows an example profile, with the data listed in @tbl-profile1.
 
-```{r fig-co2,echo=FALSE,fig.cap="CO$_{2}$ profile measured at different depths. The dashed line is an extension of the line between the two closest measurements near the surface (red point).",fig.width=4,fig.height=4,fig.align='center',message = FALSE,warning=FALSE}
+```{r fig-co2,echo=FALSE,fig.cap="CO~2~ profile measured at different depths. The dashed line is an extension of the line between the two closest measurements near the surface (red point).",fig.width=4,fig.height=4,fig.align='center',message = FALSE,warning=FALSE}
 load('data/soil-co2.Rda')
 
 p1 <- soil_co2 %>%
@@ -271,13 +271,13 @@ p1 + geom_point(data = new_co2[1,],aes(x=co2,y=depth),color='red',size = 2) +
 | 9              | 1345               |
 | 21             | 2879               |
 
-: Data for a CO$_{2}$ profile at different soil depths. {#tbl-profile1}
+: Data for a CO~2~ profile at different soil depths. {#tbl-profile1}
 
-Notice how @fig-co2 and @tbl-profile1 have CO$_{2}$ concentration on the horizontal axis and the depth is on the vertical axis, in reverse order (confusing - I know!)
+Notice how @fig-co2 and @tbl-profile1 have CO~2~ concentration on the horizontal axis and the depth is on the vertical axis, in reverse order (confusing - I know!)
 
 
 
-17. The two depths closest to the soil surface occur at 3 and 9 cm. Using the values in @tbl-profile1, Compute the rate of change in CO$_{2}$ for each unit change in depth using the two depths closest to the soil surface (this occurs at 3 and 9 cm).  **Please answer the question on the response sheet.**
+17. The two depths closest to the soil surface occur at 3 and 9 cm. Using the values in @tbl-profile1, Compute the rate of change in CO~2~ for each unit change in depth using the two depths closest to the soil surface (this occurs at 3 and 9 cm).  **Please answer the question on the response sheet.**
 
 ```{=tex}
 \begin{equation}
@@ -290,7 +290,7 @@ Notice how @fig-co2 and @tbl-profile1 have CO$_{2}$ concentration on the horizon
 
 We will assume that this rate of change remains constant to the soil surface (dashed line in @fig-co2), so our average rate of change equals $\displaystyle m \approx \frac{dC}{dz}$.
 
-18. @tbl-profile2 provides data for another CO$_{2}$ profile. Using the information in the table, estimate $\displaystyle \frac{dC}{dz}$.  **Please answer the question on the response sheet.**
+18. @tbl-profile2 provides data for another CO~2~ profile. Using the information in the table, estimate $\displaystyle \frac{dC}{dz}$.  **Please answer the question on the response sheet.**
 
 
 
@@ -300,16 +300,16 @@ We will assume that this rate of change remains constant to the soil surface (da
 | 9              | 1345               |
 | 21             | 2879               |
 
-: Another CO$_{2}$ profile at different depths. {#tbl-profile2}
+: Another CO~2~ profile at different depths. {#tbl-profile2}
 
 
-19. Which CO$_{2}$ profile (@tbl-profile1 or @tbl-profile2) would predict a larger value of $F_{s}$? Provide a quick explanation why. **Please answer the question on the response sheet.**
+19. Which CO~2~ profile (@tbl-profile1 or @tbl-profile2) would predict a larger value of $F_{s}$? Provide a quick explanation why. **Please answer the question on the response sheet.**
 
 
 
 ## Evaluating patterns in soil fluxes and environmental measurements
 
-Ok, we are set to calculate the flux $F_{s}$! Well ... almost. You may notice that in the CO$_{2}$ profile above measurements of CO$_{2}$ has units of ppm, or parts per million, which needs to be converted into molar concentrations. Additionally barometric air pressure also plays a role in computing $F_{s}$. However, once these measurements are converted, $F_{s}$ can then be computed.
+Ok, we are set to calculate the flux $F_{s}$! Well ... almost. You may notice that in the CO~2~ profile above measurements of CO~2~ has units of ppm, or parts per million, which needs to be converted into molar concentrations. Additionally barometric air pressure also plays a role in computing $F_{s}$. However, once these measurements are converted, $F_{s}$ can then be computed.
 
 Unit conversions aside, the San Joaquin Experimental Range site for the National Ecological Observatory Network makes all these measurements and publicly distributes these measurements so the soil flux can be computed. The figure below shows a multi-year computation of the flux at half-hourly intervals.
 
@@ -363,7 +363,7 @@ revised_env |>
   select(-VSWCMean,-horizontalPosition) |>
   ggplot(aes(x=date,y=soilTempMean)) + geom_line(linewidth = 1,color='red') + 
   labs(x = "Date",
-       y = "TSoil" )+
+       y= expression(T[Soil]~(degree*C)))+
   theme_bw() +
   theme(
     legend.position = "bottom",
@@ -416,10 +416,10 @@ revised_env |>
 
 ## Additional questions for exploration
 
-24. Which CO$_{2}$ profile (@tbl-profile1 or @tbl-profile2) might produce a higher uncertainty for $\displaystyle \frac{dC}{dz}$? Explain your reasoning. **Please answer the question on the response sheet.**
+24. Which CO~2~ profile (@tbl-profile1 or @tbl-profile2) might produce a higher uncertainty for $\displaystyle \frac{dC}{dz}$? Explain your reasoning. **Please answer the question on the response sheet.**
 
 
-25. Draw a conceptual picture of a soil CO$_{2}$ profile following a heavy rainstorm that re-charged the soil, but the day following the top soil layers dried out. Explain why the soil profile should look that way. **Please answer the question on the response sheet.**
+25. Draw a conceptual picture of a soil CO~2~ profile following a heavy rainstorm that re-charged the soil, but the day following the top soil layers dried out. Explain why the soil profile should look that way. **Please answer the question on the response sheet.**
 
 
 ## References

@@ -4,11 +4,11 @@ John M. Zobitz
 **The learning outcomes of this activity are:**
 
 - Understand the dynamic environmental and biological properties
-  affecting soil CO$_{2}$ efflux.
+  affecting soil CO<sub>2</sub> efflux.
 - Apply Fick’s Law of Diffusion to estimate of soil gas efflux.
 - Investigate a multi-year timeseries of soil water content, soil
   temperature, and soil gas efflux derived from Fick’s Law to infer
-  process-level changes in soil CO$_{2}$ efflux.
+  process-level changes in soil CO<sub>2</sub> efflux.
 
 Module citation: Zobitz (2024)
 
@@ -55,8 +55,9 @@ means carbon is *leaving* the soil. The other terms are:
 - $D_{a}$ is called the **diffusion coefficient** (units m$^{2}$
   s$^{-1}$). Values of $D_{a}$ also includes considerations for soil
   density and air pressure.
-- $\displaystyle \frac{dC}{dz}$ is the (vertical) gradient in CO$_{2}$.
-  We measure CO$_{2}$ in molar concentration (units $\mu$mol m$^{-3}$).
+- $\displaystyle \frac{dC}{dz}$ is the (vertical) gradient in
+  CO<sub>2</sub>. We measure CO<sub>2</sub> in molar concentration
+  (units $\mu$mol m$^{-3}$).
 - The function $f(T)$ is a function that characterizes the temperature
   response $T$ (no units).
 - The function $g(W)$ is a function that characterizes the response due
@@ -211,30 +212,30 @@ data-fig-align="center" />
 ### Summarizing up
 
 Soil water $W$ and soil temperature $T$ are considered *environmental*
-factors affecting soil CO$_{2}$. *Biological* factors such as plant
-roots and soil microbes. Plant roots respire CO$_{2}$ respire CO$_{2}$
-into the soil, called *autotrophic respiration*. Soil microbes may
-utilize soil carbon for growth, but also respire CO$_{2}$, called
-*heterotrophic respiration*.
+factors affecting soil CO<sub>2</sub>. *Biological* factors such as
+plant roots and soil microbes. Plant roots respire CO<sub>2</sub>
+respire CO<sub>2</sub> into the soil, called *autotrophic respiration*.
+Soil microbes may utilize soil carbon for growth, but also respire
+CO<sub>2</sub>, called *heterotrophic respiration*.
 
 16. In <a href="#tbl-summary" class="quarto-xref">Table 4</a> indicate
-    if the following factor increases or decreases soil CO$_{2}$ by
-    making a check ($\checkmark$) for yes or $X$ for noin the
+    if the following factor increases or decreases soil CO<sub>2</sub>
+    by making a check ($\checkmark$) for yes or $X$ for noin the
     appropriate column. **Complete the table on the response sheet.**
 
-| Factor        | Increase soil CO$_{2}$ | Decrease soil CO$_{2}$ |
-|---------------|------------------------|------------------------|
-| Temperature   |                        |                        |
-| Soil moisture |                        |                        |
-| Plant roots   |                        |                        |
-| Soil microbes |                        |                        |
+| Factor        | Increase soil CO<sub>2</sub> | Decrease soil CO<sub>2</sub> |
+|---------------|------------------------------|------------------------------|
+| Temperature   |                              |                              |
+| Soil moisture |                              |                              |
+| Plant roots   |                              |                              |
+| Soil microbes |                              |                              |
 
 ## Understanding and estimating concentration gradients
 
 The second term to calculate $F_{s}$ is $\displaystyle \frac{dC}{dz}$,
-which represents the gradient in CO$_{2}$ *at the soil surface*. This
-soil gradient is estimated $\displaystyle \frac{dC}{dz}$ using
-continuous CO$_{2}$ sensors buried in the soil.
+which represents the gradient in CO<sub>2</sub> *at the soil surface*.
+This soil gradient is estimated $\displaystyle \frac{dC}{dz}$ using
+continuous CO<sub>2</sub> sensors buried in the soil.
 
 <a href="#fig-co2" class="quarto-xref">Figure 5</a> shows an example
 profile, with the data listed in
@@ -250,16 +251,16 @@ data-fig-align="center" />
 | 21             | 2879               |
 
 Notice how <a href="#fig-co2" class="quarto-xref">Figure 5</a> and
-<a href="#tbl-profile1" class="quarto-xref">Table 5</a> have CO$_{2}$
-concentration on the horizontal axis and the depth is on the vertical
-axis, in reverse order (confusing - I know!)
+<a href="#tbl-profile1" class="quarto-xref">Table 5</a> have
+CO<sub>2</sub> concentration on the horizontal axis and the depth is on
+the vertical axis, in reverse order (confusing - I know!)
 
 17. The two depths closest to the soil surface occur at 3 and 9 cm.
     Using the values in
     <a href="#tbl-profile1" class="quarto-xref">Table 5</a>, Compute the
-    rate of change in CO$_{2}$ for each unit change in depth using the
-    two depths closest to the soil surface (this occurs at 3 and 9 cm).
-    **Please answer the question on the response sheet.**
+    rate of change in CO<sub>2</sub> for each unit change in depth using
+    the two depths closest to the soil surface (this occurs at 3 and 9
+    cm). **Please answer the question on the response sheet.**
 
 Remember to include units with your answer.
 
@@ -269,9 +270,9 @@ surface (dashed line in
 rate of change equals $\displaystyle m \approx \frac{dC}{dz}$.
 
 18. <a href="#tbl-profile2" class="quarto-xref">Table 6</a> provides
-    data for another CO$_{2}$ profile. Using the information in the
-    table, estimate $\displaystyle \frac{dC}{dz}$. **Please answer the
-    question on the response sheet.**
+    data for another CO<sub>2</sub> profile. Using the information in
+    the table, estimate $\displaystyle \frac{dC}{dz}$. **Please answer
+    the question on the response sheet.**
 
 | **Depth (cm)** | **CO**$_{2}$ (ppm) |
 |----------------|--------------------|
@@ -279,7 +280,7 @@ rate of change equals $\displaystyle m \approx \frac{dC}{dz}$.
 | 9              | 1345               |
 | 21             | 2879               |
 
-19. Which CO$_{2}$ profile
+19. Which CO<sub>2</sub> profile
     (<a href="#tbl-profile1" class="quarto-xref">Table 5</a> or
     <a href="#tbl-profile2" class="quarto-xref">Table 6</a>) would
     predict a larger value of $F_{s}$? Provide a quick explanation why.
@@ -288,11 +289,11 @@ rate of change equals $\displaystyle m \approx \frac{dC}{dz}$.
 ## Evaluating patterns in soil fluxes and environmental measurements
 
 Ok, we are set to calculate the flux $F_{s}$! Well … almost. You may
-notice that in the CO$_{2}$ profile above measurements of CO$_{2}$ has
-units of ppm, or parts per million, which needs to be converted into
-molar concentrations. Additionally barometric air pressure also plays a
-role in computing $F_{s}$. However, once these measurements are
-converted, $F_{s}$ can then be computed.
+notice that in the CO<sub>2</sub> profile above measurements of
+CO<sub>2</sub> has units of ppm, or parts per million, which needs to be
+converted into molar concentrations. Additionally barometric air
+pressure also plays a role in computing $F_{s}$. However, once these
+measurements are converted, $F_{s}$ can then be computed.
 
 Unit conversions aside, the San Joaquin Experimental Range site for the
 National Ecological Observatory Network makes all these measurements and
@@ -346,17 +347,17 @@ Range](module-v2_files/figure-commonmark/unnamed-chunk-1-1.png)
 
 ## Additional questions for exploration
 
-24. Which CO$_{2}$ profile
+24. Which CO<sub>2</sub> profile
     (<a href="#tbl-profile1" class="quarto-xref">Table 5</a> or
     <a href="#tbl-profile2" class="quarto-xref">Table 6</a>) might
     produce a higher uncertainty for $\displaystyle \frac{dC}{dz}$?
     Explain your reasoning. **Please answer the question on the response
     sheet.**
 
-25. Draw a conceptual picture of a soil CO$_{2}$ profile following a
-    heavy rainstorm that re-charged the soil, but the day following the
-    top soil layers dried out. Explain why the soil profile should look
-    that way. **Please answer the question on the response sheet.**
+25. Draw a conceptual picture of a soil CO<sub>2</sub> profile following
+    a heavy rainstorm that re-charged the soil, but the day following
+    the top soil layers dried out. Explain why the soil profile should
+    look that way. **Please answer the question on the response sheet.**
 
 ## References
 
