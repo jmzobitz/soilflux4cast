@@ -5,15 +5,31 @@ format: gfm
 ---
 
 # Theme: Soil fluxes
-- **What:** Soil fluxes of carbon (gC m-2 d-1) derived from Fick's Law of diffusion.
+- **What:** Soil fluxes of carbon (gC m^-2^ d^-1^) derived from Fick's Law of diffusion.
 - **Where:** 47 terrestrial NEON sites that span the diverse ecosystems of the U.S.
 - **When:** Daily forecasts for at least 30-days in the future are accepted at any time. The only requirement is that submissions are predictions of the future at the time the forecast is submitted.
 - **Why:** Soils are one of the largest pools of terrestrial carbon.
 
+## Prerequisites
+This module requires a working understanding of soil fluxes, ecological forecasting, and data science skills in `R`. Unsure about where to begin? Here are some resources for you:
+
+### Soil fluxes
+- [Modeling soil fluxes with NEON data](https://qubeshub.org/publications/4774/1)
+
+### Data science skills
+- [Modern Data Science with R](https://mdsr-book.github.io/mdsr3e/)
+- [R for Data Science](https://r4ds.hadley.nz/)
+- [Environmental Data Science](https://jmzobitz.github.io/eds-text/)  *work in progress*
+
+
+### Ecological forecasting
+- [Introduction to ecological forecasting](https://serc.carleton.edu/eddie/teaching_materials/modules/module5.html)
+- [Understanding uncertainty in ecological forecasts](https://serc.carleton.edu/eddie/teaching_materials/modules/module6.html)
+- [Using data to understand ecological forecasts](https://serc.carleton.edu/eddie/teaching_materials/modules/module7.html)
+
 ## Preliminaries
 This tutorial requires the following packages installed on your local `R` installation:
 ```{r}
-#| echo: FALSE
 #| message: FALSE
 
 # load up the packages
@@ -27,6 +43,8 @@ library(sf)
 Similarly, we will be using functions from the [`soilflux4cast` github repository](https://github.com/jmzobitz/soilflux4cast).  Since this is a package in development, the following code will allow you to grab the functions you need directly from github:
 
 ```{r}
+#| message: FALSE
+
 # Helper function to source from your specific repo
 source_github <- function(file_name) {
   base_url <- "https://raw.githubusercontent.com/jmzobitz/soilflux4cast/main/"
@@ -52,7 +70,7 @@ In addition to these, we have pre-selected [additional driver variables](https:/
 - `SNOD`: Snow Depth [m] 
 - `ICETK`: Ice Thickness [m]
 
-If you would like additional variables included, please file a github issue.
+If you would like additional variables included, please file a [github issue](https://github.com/jmzobitz/soilflux4cast/issues).
 
 ### Historical (Stage 3) drivers
 We provide historical (observed) driver variables listed above at each of the terrestrial NEON sites.  This is analgous to the `neon4cast::noaa_stage3()` function for the [NEON Ecological Forecasting challenges](https://projects.ecoforecast.org/neon4cast-docs/Shared-Forecast-Drivers.html#stage-3). These observed values are computed at the beginning of a calendar month and stored in the `soilflux4cast` github.
@@ -113,7 +131,7 @@ An option input `site` will only acquire forecasts at a given terrestrial NEON s
 - `ICETK`: prediction of Ice Thickness [m]
 
 ## Targets
-The target is a daily total soil flux of carbon (gC m-2 d-1) derived from half hourly estimates using the [`neonSoilFlux` `R` package](https://cran.r-project.org/web/packages/neonSoilFlux/index.html) and associated publication [LINK](https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210x.70216).  When NEON data are release on the 15th of each month, the `soilflux4cast` package computes daily values for the month previous and stores the data in the `data/targets` on the repository as flat `csv` files.
+The target is a daily total soil flux of carbon (gC m^-2^ d^-1^) derived from half hourly estimates using the [`neonSoilFlux` `R` package](https://cran.r-project.org/web/packages/neonSoilFlux/index.html) and associated publication [LINK](https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210x.70216).  When NEON data are release on the 15th of each month, the `soilflux4cast` package computes daily values for the month previous and stores the data in the `data/targets` on the repository as flat `csv` files.
 
 These targets are also accessible through the `download_values` function, setting the `variables` input to `targets`:
 
@@ -137,7 +155,7 @@ The output has the following variables:
 ## Models
 All modeling approaches are welcome!  This tutorial will take you through developing a simple forecast using a linear model with the covariates at the UNDE NEON Site.
 
-First lets acquire the driver variables to see what soil flux is like, we'll use `dplyr` function `filter` to just examine the NEON UNDE site:
+First lets acquire the driver variables to see what soil flux is like, we'll use `dplyr` function `filter` to just examine the [NEON UNDE](https://www.neonscience.org/field-sites/unde) site:
 
 ```{r}
 
@@ -147,32 +165,41 @@ drivers <- download_values(
   month = "04"  # optional - you can omit if you want values for the entire year
   )
 
-# Get UNDE site:
+# Get drivers for UNDE site:
 unde_drivers <- drivers |>
   filter(site_id == "UNDE")
 
-# Plot. Note that TSOIL is in Kelvin
+# Plot the drivers separately. 
+
+# Note that TSOIL is in Kelvin
 unde_drivers |>
-  pivot_longer(cols=c("TSOIL","SOILW")) |>
-  ggplot(aes(x=datetime,y=value)) +
+  ggplot(aes(x=datetime,y=TSOIL)) +
   geom_line() +
   geom_point() +
-  facet_grid(name~.,scales = "free") +
   theme_minimal()
+
+unde_drivers |>
+  pivot_longer(cols=c("SOILW")) |>
+  ggplot(aes(x=datetime,y=TSOIL)) +
+  geom_line() +
+  geom_point() +
+  theme_minimal()
+
 
 ```
 
-Next let's take a look at the targets across this same time:
+Next let's take a look at the targets across this same time frame:
 
 ```{r}
 
-### Acquire targets for parameterization
+### Acquire targets for April 2024.
 targets <- download_values(
   variable = "targets",
   year = "2025",
   month = "04"  # optional - you can omit if you want values for the entire year
   ) 
 
+# Filter the targets so you have just the UNDE NEON site:
 unde_targets <- targets |>
   filter(site_id == "UNDE")
 
@@ -185,18 +212,20 @@ unde_targets |>
 
 ```
 
-Now we are going to determine a model, which we will do using a join.
+Now we are going to parameterize a model to predict soil fluxes using simple linear regression. The model will have the form $R_{S} = a_{0} + a_{1} T_{S} + a_{2} SWC$, where $T_{S}$ is soil temperature, $SWC$ soil water content. 
+
+To parameterize the model will require some data wrangling, first by joining the drivers and targets together.
 ```{r}
+
+# Join the targets and drivers together
 joined_unde <-  unde_targets |>
   inner_join(unde_drivers, by=c("site_id","startDateTime"="datetime")) |> 
-  drop_na()
+  drop_na()  # Remove any NA values to avoid errors when fitting.
 
-# Use 
-lm_fit <- lm(flux~SOILW+TSOIL,data=joined_unde)
-coeff <- lm_fit |> broom::tidy()
+# Compute the model 
+lm_fit <- lm(flux~SOILW+TSOIL,data=joined_unde)  # Parameterize the model
+coeff <- lm_fit |> broom::tidy()  # Extract the coefficients
 sigma <- sd(lm_fit$residuals)  # Our modeling error
-
-
 
 ```
 
@@ -204,19 +233,23 @@ Now let's make a prediction for the next day with our forecast:
 
 ```{r}
 
+# Acquire the drivers for May 1.
 fx_drivers_unde <- noaa_soil_drivers(
   forecast_date = "2025-05-01",
   site = "UNDE"
   )
 
-# Select out the variables of interest:
-#Create prediction matrix (include intercept by adding a column of 1)
+# Now we are ready to predict with these forecast drivers
+# Create prediction matrix (include intercept by adding a column of 1)
 
 X <- model.matrix(~ 1 + SOILW + TSOIL, data = fx_drivers_unde)
+
+# Set the model coefficients as a vector so we can predict.
 coeff_vec <- coeff |>
     select(term,estimate) |>
     deframe()
-  
+
+# Calculate the predicted forecasts
 fx_unde_out <- fx_drivers_unde |>
   mutate(prediction = ((X %*% coeff_vec)  |>
     as.numeric() ))
@@ -231,7 +264,12 @@ fx_unde_out |>
   theme_minimal()
 ```
 
-However the targets are computed as a daily value, so we might improve on things if we compute daily averages of the forecast driver variables first:
+However the targets are computed as a daily value, so we might improve on things if we compute daily averages of the forecast driver variables first. While the workflow is the same, we will need to do some data wrangling to get the average soil temperature and soil water each day with the following workflow:
+
+1. Use `floor_date` to determine each day (as a categorical variable)
+2. For each `ensemble` and `datetime` compute the average soil temperature and soil water.
+3. Add in `reference_datetime` to know the date the forecast was created.
+4. Form your model matrix `X` and do the prediction.
 
 ```{r}
 fx_drivers_unde_day <- fx_unde_out |>
@@ -253,7 +291,7 @@ fx_unde_out_day <- fx_drivers_unde_day |>
 ```
 
 ### Forecast standards
-We follow a similar standard for submission of forecasts for the [NEON Ecological Forecasting Challenge](https://projects.ecoforecast.org/neon4cast-ci/instructions.html#forecast-file-format):
+Once the forecast is created, we follow a similar standard for submission of forecasts for the [NEON Ecological Forecasting Challenge](https://projects.ecoforecast.org/neon4cast-ci/instructions.html#forecast-file-format):
 
 - `project_id`: use soilflux4cast
 - `model_id`: the short name of the model defined as the `model_id` in your registration. The `model_id` should have no spaces. model_id should reflect a method to forecast one or a set of target variables and must be unique to the neon4cast challenge.
@@ -266,6 +304,7 @@ We follow a similar standard for submission of forecasts for the [NEON Ecologica
 - `variable`: standardized variable name. For this, use 'soil_flux'.
 - `prediction`: forecasted value for the parameter in the parameter column
 
+To conform to these standards we will need to add some additional variables to our data table before submission:
 ```{r}
 fx_unde_submission <- fx_unde_out_day |>
   mutate(duration = 'P1D',
@@ -281,14 +320,17 @@ fx_unde_submission <- fx_unde_out_day |>
 
 
 ### Model evaluation
+How did our forecast perform? Because we did a hindcast, we can evaluate the performance of the forecast:
+
 ```{r}
-### Acquire targets for parameterization
+### Acquire targets for comparison (for the next month)
 targets_eval <- download_values(
   variable = "targets",
   year = "2025",
   month = "05"  # optional - you can omit if you want values for the entire year
   ) 
 
+# Just get the UNDE site
 unde_targets_eval <- targets_eval |>
   filter(site_id == "UNDE")
 

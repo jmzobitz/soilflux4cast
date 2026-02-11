@@ -1,0 +1,422 @@
+---
+title: "Modeling Soil Fluxes with NEON Data"
+author: John M. Zobitz
+format:
+  gfm:
+    prefer-html: true
+  html:
+    include-in-header: mathjax.html
+    embed-resources: true
+  pdf: 
+    geometry: 
+      - top=30mm
+      - left=20mm
+editor: source
+bibliography: macrosystems-tm.bib
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# Define the packages that we need to load up:
+library(tidyverse)
+library(lubridate)
+library(bookdown)
+library(knitr)
+library(ggthemes)
+
+
+
+```
+
+**The learning outcomes of this activity are:**
+
+-   Understand the dynamic environmental and biological properties affecting soil CO$_{2}$ efflux.
+-   Apply Fick's Law of Diffusion to estimate of soil gas efflux.
+-   Investigate a multi-year timeseries of soil water content, soil temperature, and soil gas efflux derived from Fick's Law to infer process-level changes in soil CO$_{2}$ efflux.
+
+Module citation: @QUBES4774
+
+**Instructions:** Read carefully and in your groups *working together* answer the numbered questions on your response paper. If you get stuck, please ask!
+
+# Introduction
+
+The [global carbon cycle](https://oceanservice.noaa.gov/facts/carbon-cycle.html) has many different components, but of particular importance is the amount of carbon in soils. Scientists believe soils have the largest reservoir of carbon [@jobbagyVerticalDistributionSoil2000]. A key quantity is the soil carbon flux, or the rate of change per unit area of the amount of carbon leaving the soil and entering the atmosphere. This activity will guide you through the measurements used to model and compute soil fluxes using data collected from the National Ecological Observatory Network, or NEON for short.
+
+1.  Read more about NEON: [LINK](https://www.neonscience.org/about). After reviewing the information on this page, what did you wonder or notice? What would you like to know more about? **Please answer the question on the response sheet.**
+
+2.  One site in NEON is the [San Joaquin Experimental Range](https://www.neonscience.org/field-sites/sjer) website and record three facts you find interesting or important. What scientific or ecological questions do you think could be studied here? **Please answer the question on the response sheet.**
+
+
+# Fick's law
+We will denote the soil carbon flux as $F_{s}$, measured in $\mu$mol m$^{-2}$ s$^{-1}$. The key equation to compute the soil flux at a given location is **Fick's law of Diffusion**:
+
+```{=tex}
+\begin{equation}
+F_{s} = - D_{a} \cdot f(T) \cdot g(W) \cdot \frac{dC}{dz},
+\end{equation}
+```
+
+
+| The negative sign in Fick's Law makes $F_{s}$ a positive value, which means carbon is *leaving* the soil. The other terms are:
+
+-   $D_{a}$ is called the **diffusion coefficient** (units m$^{2}$ s$^{-1}$). Values of $D_{a}$ also includes considerations for soil density and air pressure.
+-   $\displaystyle \frac{dC}{dz}$ is the (vertical) gradient in CO$_{2}$. We measure CO$_{2}$ in molar concentration (units $\mu$mol m$^{-3}$).
+-   The function $f(T)$ is a function that characterizes the temperature response $T$ (no units).
+-   The function $g(W)$ is a function that characterizes the response due to soil water content $W$ (no units).
+
+We will investigate $f(T)$ and $g(W)$ separately below. Usually the values of $f(T)$ and $g(W)$ range between 0 to 1, meaning they increase or decrease the baseline value $D_{a}$ through a scaling factor.
+
+## Dependence of Fick's Law on soil water and temperature
+
+### Understanding $g(W)$
+
+Water in soils also reduces pore spaces (or *porosity*), which is quantified by the *soil water content* or *W*. Soil water content is measured on a scale between 0 to 1, where $W = 0$ means the soil is completely dry, and $W = 1$ then soil is completely saturated.
+
+See @fig-diffusion for a conceptual diagram of this [LINK](https://www.encyclopedie-environnement.org/en/zoom/diffusion-and-percolation-in-soils/).
+
+![Conceptual model of diffusion. Panel 1 has higher porosity compared to Panel 2, allowing carbon dioxide to diffuse more freely.](diffusion.png){width=50% #fig-diffusion}
+
+3. Based on this information, when soils are completely dry, we would expect **more / less** diffusion compared to when soils are completely wet. **Please circle the correct answer on the response sheet.**
+
+We will consider the effect of $W$ on soil diffusion with a function $g(W)$ that reduces diffusion by a proportional amount. One possibility for $g(W)$ is:
+
+-   $g(W)=1$ when $W=0$ (meaning that there is no effect when soils are dry)
+-   $g(W)=0$ is when $W=1$ (meaning when soils are completely saturated there is no soil diffusion).
+
+These two points are labeled in @fig-grid-water.
+
+```{r fig-grid-water,echo=FALSE,fig.cap="Grid for drawing $g(W)$ for different models.",fig.width=4,fig.height=4,fig.align='center',message = FALSE,warning=FALSE}
+
+
+ggplot() + ylim(c(0,1)) + xlim(c(0,1)) + 
+  geom_point(data = tibble(x=c(0,1),y=c(1,0)),aes(x=x,y=y),size=4,color='blue') +
+  xlab("W") + ylab("g(W)") +
+  theme_bw() +
+  theme(
+    legend.position = "bottom",
+    legend.text = element_text(size = 14),
+    axis.title.x = element_text(size = 14),
+    axis.text.x = element_text(size = 10),
+    axis.text.y = element_text(size = 10),
+    axis.title.y = element_text(size = 14)
+  ) 
+
+
+```
+
+4. Let's assume the function $g(W)$ is **linear**. Sketch a linear equation between the two points in @fig-grid-water for $0 \leq W \leq 1$. **Sketch the function on the grid in the response sheet.** Then determine the formula for the linear function $g(W)$ on your response sheet, showing your work appropriately. **Please answer the question on the response sheet.**
+
+Another possibility for the function $g(W)$, which represents the effect of soil water on $D_{s}$. A possible equation for $g(W)$ is the following [@moyanoMoistureResponseSoil2012]:
+
+```{=tex}
+\begin{equation}\label{eq:moyano}
+g(W) = \begin{cases}
+\displaystyle \frac{(.42 - W)^{(10/3)}}{.1764}, & \;\; 0 \leq W \leq 0.42 \\
+0 & \;\; 0.42 < W 
+\end{cases}
+\end{equation}
+```
+
+5. Evaluate $g(W)$ for different values of $W$, filling in @tbl-water below **on your response sheet**:
+
+| $W$             | $0$ | $0.2$ | $0.4$ | $0.6$ | $0.8$ | $1$ |
+|-----------------|-----|-------|-------|-------|-------|-----|
+| $g(W)$ (linear) |     |       |       |       |       |     |
+| $g(W)$ (Equation \ref{eq:moyano}) |     |       |       |       |       |     |
+
+: Comparison of different response functions to increasing soil water content $W$. {#tbl-water}
+
+6. Use the information in @tbl-water to add the Moyano model for $g(W)$ in @fig-grid-water. **Sketch the function on the grid in the response sheet.** What do you notice about the Moyano model in comparison to your linear model? **Please answer the question on the response sheet.**
+
+7. Using the information in @tbl-water and @fig-grid-water, as $W$ increases, compared to the linear model the Moyano model is more / less sensitive to changes in soil water content because the linear model for $g(W)$ is greater than / less than the Moyano model at the same value of $W$. **Please circle the correct answers on the response sheet.**
+
+8. Since $g(W)$ ultimately affects $D_{s}$, which in turn is directly proportional to $F_{s}$, interpret your previous graph to determine for what values of $W$ would cause soil flux, $F_{s}$, to increase? to decrease? **Please answer the question on the response sheet.**
+
+### Understanding $f(T)$
+
+Temperature also affects soil diffusion. The equation for $f(T)$ is the following:
+
+```{=tex}
+\begin{equation}
+f(T) = \left(\frac{T+273.15}{293.15}\right)^{1.75}
+\end{equation}
+```
+9. Evaluate $f(T)$ for different values of $T$, filling in entries in @tbl-temperature below **on your response sheet**:
+
+| $T$                  | $10$ | $15$ | $20$ | $25$ | $30$ | $35$ | $40$ | $45$ | $50$ |
+|----------------------|------|------|------|------|------|------|------|------|------|
+| $f(T)$ ($^{\circ}$C) |      |      |      |      |      |      |      |      |      |
+
+: Evaluation of $f(T)$ for different soil temperatures $T$ {#tbl-temperature}
+
+10. Next use the information in @tbl-temperature, along with other additional points, to make a plot of $f(T)$ in @fig-grid-temp. **Graph the function on your response sheet.**
+
+```{r fig-grid-temp,echo=FALSE,fig.cap="Grid for drawing $f(T)$.",fig.width=4,fig.height=4,fig.align='center',message = FALSE,warning=FALSE}
+
+
+ggplot() + ylim(c(0,2)) + xlim(c(10,50)) + 
+  xlab("T (°C)") + ylab("f(T)") +
+  theme_bw() +
+  theme(
+    legend.position = "bottom",
+    legend.text = element_text(size = 14),
+    axis.title.x = element_text(size = 14),
+    axis.text.x = element_text(size = 10),
+    axis.text.y = element_text(size = 10),
+    axis.title.y = element_text(size = 14)
+  ) 
+
+
+```
+
+11. Based on the information in @tbl-temperature and Figure @fig-grid-temp, $f(T)$ is **increasing / decreasing** as temperature $T$ increases. **Circle the correct answer on the response sheet.**
+
+Next let's consider how $f(T)$ changes over the course of a day. At a given hour $h$ in the day, soil temperature near the surface can be represented with the following equation:
+
+```{=tex}
+\begin{equation}
+T(h) = 30-10 \sin \left(\frac{\pi h}{12} \right)
+\end{equation}
+```
+
+
+12. Complete @tbl-temperature-day for different values of $h$, first by evaluating $T(h)$ and then by evaluating $f(T)$. **Fill in the table on the response sheet.**
+
+| $h$                  | $0$ | $4$ | $8$ | $12$ | $16$ | $20$ | $24$ | $50$ |
+|-------------------------|-----|-----|-----|------|------|------|------|------|
+| $T(h)$ ($^{\circ}$C) |     |     |     |      |      |      |      |      |
+| $f(T)$               |     |     |     |      |      |      |      |      |
+
+: Evaluation of $f(T)$ for different soil temperatures $T$ {#tbl-temperature-day}
+
+13. Finally use the information @tbl-temperature-day along with other values to sketch $f(T)$ over the course of the day in @fig-grid-temp-day-hour. **Sketch your graph on the grid in the response sheet.**
+
+```{r fig-grid-temp-day-hour,echo=FALSE,fig.cap="Grid for drawing $f(T)$.",fig.width=4,fig.height=4,fig.align='center',message = FALSE,warning=FALSE}
+
+
+ggplot() +
+  geom_blank()+
+  ylab("f(T)") + xlab("h") +
+  theme_bw() +
+  theme(
+    legend.position = "bottom",
+    legend.text = element_text(size = 14),
+    axis.title.x = element_text(size = 14),
+    axis.text.x = element_text(size = 10),
+    axis.text.y = element_text(size = 10),
+    axis.title.y = element_text(size = 14)
+  ) + scale_x_continuous(breaks=seq(0,24,by=4),
+                         limits = c(0,25),
+                         minor_breaks = seq(0,24,by=2)) +
+    ylim(c(0,2))
+
+```
+
+14. Using your graph, explain how the plot of $T(h)$ in @fig-grid-temp-day-hour could be representative of soil temperature over the course of a warm day. **Please answer the question on the response sheet.**
+
+15. Since $f(T)$ ultimately affects $D_{s}$, which in turn is directly proportional to $F_{s}$, interpret your previous graph to determine at what hours of the day would you expect the flux $F_{s}$ to be the largest. At what hours of the day is $F_{s}$ the smallest? Increasing or decreasing the quickest? **Please answer the question on the response sheet.**
+
+### Summarizing up
+
+Soil water $W$ and soil temperature $T$ are considered *environmental* factors affecting soil CO$_{2}$. *Biological* factors such as plant roots and soil microbes. Plant roots respire CO$_{2}$ respire CO$_{2}$ into the soil, called *autotrophic respiration*. Soil microbes may utilize soil carbon for growth, but also respire CO$_{2}$, called *heterotrophic respiration*.
+
+16. In @tbl-summary indicate if the following factor increases or decreases soil CO$_{2}$ by making a check ($\checkmark$) for yes or $X$ for noin the appropriate column. **Complete the table on the response sheet.**
+
+| Factor        | Increase soil CO$_{2}$ | Decrease soil CO$_{2}$ |
+|---------------|------------------------|------------------------|
+| Temperature   |                        |                        |
+| Soil moisture |                        |                        |
+| Plant roots   |                        |                        |
+| Soil microbes |                        |                        |
+
+: Evaluation of different factors that influence soil CO$_{2}$. {#tbl-summary}
+
+## Understanding and estimating concentration gradients
+
+The second term to calculate $F_{s}$ is $\displaystyle \frac{dC}{dz}$, which represents the gradient in CO$_{2}$ *at the soil surface*. This soil gradient is estimated $\displaystyle \frac{dC}{dz}$ using continuous CO$_{2}$ sensors buried in the soil.
+
+@fig-co2 shows an example profile, with the data listed in @tbl-profile1.
+
+```{r fig-co2,echo=FALSE,fig.cap="CO$_{2}$ profile measured at different depths. The dashed line is an extension of the line between the two closest measurements near the surface (red point).",fig.width=4,fig.height=4,fig.align='center',message = FALSE,warning=FALSE}
+load('data/soil-co2.Rda')
+
+p1 <- soil_co2 %>%
+  filter(hr==18) %>%
+  ggplot(aes(x=co2,y=depth*100)) +geom_point(size=2) + geom_line() + ylim(c(0,25)) +  scale_y_reverse() + xlab("CO2 concentration (ppm)") + ylab("Depth (cm)") +
+  theme_bw() +
+  theme(
+    legend.position = "bottom",
+    legend.text = element_text(size = 14),
+    axis.title.x = element_text(size = 14),
+    axis.text.x = element_text(size = 10),
+    axis.text.y = element_text(size = 10),
+    axis.title.y = element_text(size = 14)
+  ) 
+
+# OK y = y0 + m*(x-x0), so at 0, x = -y0/m+x0.
+
+new_co2 <- tibble(co2 = c(-.03/(.09-.03)*(993-530)+530,530), depth= c(0,.03))
+p1 + geom_point(data = new_co2[1,],aes(x=co2,y=depth),color='red',size = 2) +
+  geom_line(data = new_co2,aes(x=co2,y=depth*100),linetype='dashed')
+
+
+```
+
+
+| **Depth (cm)** | **CO**$_{2}$ (ppm) |
+|----------------|--------------------|
+| 3              | 735                |
+| 9              | 1345               |
+| 21             | 2879               |
+
+: Data for a CO$_{2}$ profile at different soil depths. {#tbl-profile1}
+
+Notice how @fig-co2 and @tbl-profile1 have CO$_{2}$ concentration on the horizontal axis and the depth is on the vertical axis, in reverse order (confusing - I know!)
+
+
+
+17. The two depths closest to the soil surface occur at 3 and 9 cm. Using the values in @tbl-profile1, Compute the rate of change in CO$_{2}$ for each unit change in depth using the two depths closest to the soil surface (this occurs at 3 and 9 cm).  **Please answer the question on the response sheet.**
+
+```{=tex}
+\begin{equation}
+\frac{dC}{dz} \approx \frac{C_{\mbox{at 9 cm}} - C_{\mbox{at 3 cm}}}{9-3}
+\end{equation}
+```
+
+| Remember to include units with your answer.
+
+
+We will assume that this rate of change remains constant to the soil surface (dashed line in @fig-co2), so our average rate of change equals $\displaystyle m \approx \frac{dC}{dz}$.
+
+18. @tbl-profile2 provides data for another CO$_{2}$ profile. Using the information in the table, estimate $\displaystyle \frac{dC}{dz}$.  **Please answer the question on the response sheet.**
+
+
+
+| **Depth (cm)** | **CO**$_{2}$ (ppm) |
+|----------------|--------------------|
+| 3              | 735                |
+| 9              | 1345               |
+| 21             | 2879               |
+
+: Another CO$_{2}$ profile at different depths. {#tbl-profile2}
+
+
+19. Which CO$_{2}$ profile (@tbl-profile1 or @tbl-profile2) would predict a larger value of $F_{s}$? Provide a quick explanation why. **Please answer the question on the response sheet.**
+
+
+
+## Evaluating patterns in soil fluxes and environmental measurements
+
+Ok, we are set to calculate the flux $F_{s}$! Well ... almost. You may notice that in the CO$_{2}$ profile above measurements of CO$_{2}$ has units of ppm, or parts per million, which needs to be converted into molar concentrations. Additionally barometric air pressure also plays a role in computing $F_{s}$. However, once these measurements are converted, $F_{s}$ can then be computed.
+
+Unit conversions aside, the San Joaquin Experimental Range site for the National Ecological Observatory Network makes all these measurements and publicly distributes these measurements so the soil flux can be computed. The figure below shows a multi-year computation of the flux at half-hourly intervals.
+
+```{r,warning=FALSE,echo=FALSE,message=FALSE,fig.cap="Soil flux at the San Joaquin Experimental Range"}
+load('data/sjer.Rda')
+
+
+revised_flux <- flux_vals |>
+  mutate(date = lubridate::date(startDateTime)) |>
+  group_by(date) |>
+  summarize(flux = mean(flux,na.rm=TRUE))
+
+
+revised_flux |>
+  ggplot(aes(x=date,y=flux)) + geom_line(linewidth = 1) + 
+  labs(x = "Date",
+       y = "Flux (umol m-2 s-1") +
+  theme_bw() +
+  theme(
+    legend.position = "bottom",
+    legend.text = element_text(size = 14),
+    axis.title.x = element_text(size = 14),
+    axis.text.x = element_text(size = 10),
+    axis.text.y = element_text(size = 10),
+    axis.title.y = element_text(size = 14)
+  ) 
+
+```
+
+20. Study the above interactive figure. Working with your group, identify:
+
+ - time intervals where $F_{s}$ increases rapidly.
+ - time intervals where $F_{s}$ steadily increases.
+ - time intervals where $F_{s}$ has several fluctuations.
+ 
+| **Please answer the question on the response sheet.**
+
+21. Next co-locate these intervals with measurements of $T$ (@fig-soil-t) and $W$ (@fig-soil-water). Explain how the measurements of $T$ and $W$ during these intervals would lead to larger or smaller values of $F_{s}$. **Please answer the question on the response sheet.**
+
+```{r fig-soil-t,warning=FALSE,echo=FALSE,message=FALSE,fig.cap="Soil temperature at 2 cm in the San Joaquin Experimental Range"}
+
+revised_env <- env_vals |>
+  filter(verticalPosition == '501') |>
+  mutate(date = lubridate::date(startDateTime)) |>
+  group_by(date,horizontalPosition) |>
+  summarize(VSWCMean = mean(VSWCMean,na.rm=TRUE),
+            soilTempMean = mean(soilTempMean,na.rm=TRUE) )
+
+
+revised_env |>
+  select(-VSWCMean,-horizontalPosition) |>
+  ggplot(aes(x=date,y=soilTempMean)) + geom_line(linewidth = 1,color='red') + 
+  labs(x = "Date",
+       y = "TSoil" )+
+  theme_bw() +
+  theme(
+    legend.position = "bottom",
+    legend.text = element_text(size = 14),
+    axis.title.x = element_text(size = 14),
+    axis.text.x = element_text(size = 10),
+    axis.text.y = element_text(size = 10),
+    axis.title.y = element_text(size = 14)
+  ) 
+
+
+
+```
+
+```{r fig-soil-water,warning=FALSE,echo=FALSE,message=FALSE,fig.cap="Surface soil water content in the San Joaquin Experimental Range"}
+
+
+revised_env |>
+  select(-soilTempMean,-horizontalPosition) |>
+  ggplot(aes(x=date,y=VSWCMean)) + geom_line(linewidth = 1,color='blue') + 
+  labs(x = "Date",
+       y = "SWC" )+
+  theme_bw() +
+  theme(
+    legend.position = "bottom",
+    legend.text = element_text(size = 14),
+    axis.title.x = element_text(size = 14),
+    axis.text.x = element_text(size = 10),
+    axis.text.y = element_text(size = 10),
+    axis.title.y = element_text(size = 14)
+  ) 
+
+
+
+
+```
+
+
+
+22. Choose two particular half-hours that correspond to where $F_{s}$ is low and another where $F_{s}$ is high and record your values of $F_{s}$, $T$, and $W$ in @tbl-flux-compare. Compute $f(T)$ and $g(W)$ at each of these times. Explain how these computations provide evidence / support for the calculated value of $F_{s}$. **Please fill in the table on the response sheet.**
+
+| h     | $T$ | $W$ | $f(T)$ | $g(W)$ | $F_{s}$ |     |
+|---------|-----|-----|--------|--------|---------|-----|
+| $F_{s}$ low:  |     |     |        |        |         |     |
+| $F_{s}$ high: |     |     |        |        |         |     |
+
+: Summary table comparing two fluxes {#tbl-flux-compare}
+
+23. Here is a link to nearby weather station located by the San Joaquin Experimental Range: [LINK](https://www.timeanddate.com/weather/@5359383). Look at the historical weather during the dates and intervals you selected to see if you can infer any additional evidence and support for what observed in $T$, $W$, $D_{s}$, or $F_{s}$. **Please answer the question on the response sheet.**
+
+## Additional questions for exploration
+
+24. Which CO$_{2}$ profile (@tbl-profile1 or @tbl-profile2) might produce a higher uncertainty for $\displaystyle \frac{dC}{dz}$? Explain your reasoning. **Please answer the question on the response sheet.**
+
+
+25. Draw a conceptual picture of a soil CO$_{2}$ profile following a heavy rainstorm that re-charged the soil, but the day following the top soil layers dried out. Explain why the soil profile should look that way. **Please answer the question on the response sheet.**
+
+
