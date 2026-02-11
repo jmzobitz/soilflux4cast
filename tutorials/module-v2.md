@@ -12,6 +12,9 @@ John M. Zobitz
 
 Module citation: Zobitz (2024)
 
+Response sheet (.docx):
+[LINK](https://github.com/jmzobitz/soilflux4cast/raw/refs/heads/main/tutorials/module-v2-response.docx)
+
 **Instructions:** Read carefully and in your groups *working together*
 answer the numbered questions on your response paper. If you get stuck,
 please ask!
@@ -355,6 +358,8 @@ Range](module-v2_files/figure-commonmark/unnamed-chunk-1-1.png)
     top soil layers dried out. Explain why the soil profile should look
     that way. **Please answer the question on the response sheet.**
 
+## References
+
 <div id="refs" class="references csl-bib-body hanging-indent"
 entry-spacing="0">
 
@@ -379,7 +384,7 @@ Respiration: Interaction with Soil Properties.” *Biogeosciences* 9 (3):
 <div id="ref-QUBES4774" class="csl-entry">
 
 Zobitz, John. 2024. “Modeling Soil Fluxes with NEON Data.”
-<https://doi.org/doi:/10.25334/ZYWW-R139>.
+<https://doi.org/10.25334/ZYWW-R139>.
 
 </div>
 

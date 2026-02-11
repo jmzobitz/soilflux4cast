@@ -36,6 +36,8 @@ library(ggthemes)
 
 Module citation: @QUBES4774
 
+Response sheet (.docx): [LINK](https://github.com/jmzobitz/soilflux4cast/raw/refs/heads/main/tutorials/module-v2-response.docx)
+
 **Instructions:** Read carefully and in your groups *working together* answer the numbered questions on your response paper. If you get stuck, please ask!
 
 # Introduction
@@ -420,3 +422,4 @@ revised_env |>
 25. Draw a conceptual picture of a soil CO$_{2}$ profile following a heavy rainstorm that re-charged the soil, but the day following the top soil layers dried out. Explain why the soil profile should look that way. **Please answer the question on the response sheet.**
 
 
+## References
