@@ -26,6 +26,7 @@ This module requires a working understanding of soil fluxes, ecological forecast
 - [Introduction to ecological forecasting](https://serc.carleton.edu/eddie/teaching_materials/modules/module5.html)
 - [Understanding uncertainty in ecological forecasts](https://serc.carleton.edu/eddie/teaching_materials/modules/module6.html)
 - [Using data to understand ecological forecasts](https://serc.carleton.edu/eddie/teaching_materials/modules/module7.html)
+- [A Practical Guide to Ecosystem Forecasting](https://frec-5174.github.io/eco4cast-in-R-book/)
 
 ## Preliminaries
 This tutorial requires the following packages installed on your local `R` installation:
@@ -402,7 +403,7 @@ Clearly this is poorly calibrated, overconfident forecast!  The reliability (per
 1. Generate a forecast!
 2. Write the forecast output to a file that follows the [standardized format for the NEON EFI forecast challenge](https://projects.ecoforecast.org/neon4cast-ci/instructions.html#submission-process): `soil_flux-year-month-day-model_id.csv`. Compressed csv files with the csv.gz extension are also accepted. The year, month, and day are the year, month, and day the `reference_datetime` (`horizon = 0`).
 3. Submit your forecast to `zobitz@augsburg.edu` with the subject line soil_flux-year-month-day-model_id, along with an `R` function to run your forecast (if you want it to be automated)
-4. Register and describe your model here: [LINK](https://docs.google.com/forms/d/e/1FAIpQLScOnp6q5ODkPAIYplau-eWUE6mPEs4-9loMikOC6ugWgzGTkQ/viewform?usp=publish-editor). You are not required to register if your forecast submission uses the word “example” in your model_id”. Any forecasts with “example” in the model_id will not be used in forecast evaluation analyses. You can use neon4cast as the challenge for which you are registering.
+4. Register and describe your model here: [LINK](https://docs.google.com/forms/d/e/1FAIpQLScOnp6q5ODkPAIYplau-eWUE6mPEs4-9loMikOC6ugWgzGTkQ/viewform?usp=sharing&ouid=110173876465247112627). You are not required to register if your forecast submission uses the word “example” in your model_id”. Any forecasts with “example” in the model_id will not be used in forecast evaluation analyses. You can use neon4cast as the challenge for which you are registering.
 5. Watch your forecast be evaluated as new data are collected.
 
 

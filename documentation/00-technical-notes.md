@@ -1,9 +1,9 @@
 # Technical notes on soilflux4cast
 
-
+(( Work in progress ))
 ## Time interval
 
-- Environmental drivers: 00 UTC
+- Environmental drivers: Daily
 - Fluxes: Daily
 
 ## Environmental drivers

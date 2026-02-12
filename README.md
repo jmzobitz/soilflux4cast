@@ -3,12 +3,16 @@
 
 This repository contains information to run a soil flux forecast at terrestrial NEON sites.
 
-- `data/drivers` contains the daily average soil temperature and soil water in the top surface for each NEON site (automated through a github action `Daily Prediction Update`)
+**Where to begin**? The best place to see what this repository can do is with the tutorial [Introduction to soil flux forecasting](https://github.com/jmzobitz/soilflux4cast/blob/main/tutorials/introducing_soil_flux.md)
+
+Other helpful information:
+- `data/drivers` contains the monthly files with daily averaged driver variables observed at NEON sites (soil water content and soil temperature) and from NOAA GEFS. This is useful for forecast development and testing.
 - `data/outputs` contains modeled output for daily soil flux forecasts (automated through a github action `Daily Prediction Update`)
-- `data/targets` contains the computed daily soil flux at 00 UTC at each NEON site; the data latency is 1 month.  You can see which months are available with the helper function `targets_available`
-- `R/` contains useful `R` functions for analysis:
+- `data/targets` contains the computed daily soil flux (gC m^-2^ d^-1^) at terrestrial NEON sites; the data latency is 1 month.
+- `R/` contains useful `R` functions for analysis
+- `scripts/` are useful scripts files used to build and evaluate forecasts.
   - `gefs_soil_forecasts` acquires covariates at a select NEON site.
-  - `targets_available` lets you know for which month there are soil flux targets (both for evaluation and hindcasting)
+  - `tutorials` are short vignettes on developing [soil flux forecasts](https://github.com/jmzobitz/soilflux4cast/blob/main/tutorials/introducing_soil_flux.md) and about [soil fluxes](https://github.com/jmzobitz/soilflux4cast/blob/main/tutorials/module-v2.md) in general.
   
 
 ## Technical notes

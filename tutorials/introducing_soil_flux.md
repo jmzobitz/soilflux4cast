@@ -38,6 +38,8 @@ begin? Here are some resources for you:
   forecasts](https://serc.carleton.edu/eddie/teaching_materials/modules/module6.html)
 - [Using data to understand ecological
   forecasts](https://serc.carleton.edu/eddie/teaching_materials/modules/module7.html)
+- [A Practical Guide to Ecosystem
+  Forecasting](https://frec-5174.github.io/eco4cast-in-R-book/)
 
 ## Preliminaries
 
@@ -539,7 +541,7 @@ interval)
     soil_flux-year-month-day-model_id, along with an `R` function to run
     your forecast (if you want it to be automated)
 4.  Register and describe your model here:
-    [LINK](https://docs.google.com/forms/d/e/1FAIpQLScOnp6q5ODkPAIYplau-eWUE6mPEs4-9loMikOC6ugWgzGTkQ/viewform?usp=publish-editor).
+    [LINK](https://docs.google.com/forms/d/e/1FAIpQLScOnp6q5ODkPAIYplau-eWUE6mPEs4-9loMikOC6ugWgzGTkQ/viewform?usp=sharing&ouid=110173876465247112627).
     You are not required to register if your forecast submission uses
     the word “example” in your model_id”. Any forecasts with “example”
     in the model_id will not be used in forecast evaluation analyses.
