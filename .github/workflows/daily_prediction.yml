@@ -3,6 +3,11 @@ permissions:
   contents: write
   pull-requests: write
 
+env:
+  R_REPOS_OVERRIDE: https://cloud.r-project.org
+  RENV_CONFIG_REPOS_OVERRIDE: https://cloud.r-project.org
+  
+  
 on:
   schedule:
     - cron: '0 10 * * *'
