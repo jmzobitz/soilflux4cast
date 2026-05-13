@@ -73,17 +73,15 @@ jobs:
         with:
           r-version: '4.5.0'
 
+      - name: Set up renv
+        uses: r-lib/actions/setup-renv@v2
+
       - name: Install system dependencies for terra
         run: |
           sudo apt-get update
           sudo apt-get install -y libgdal-dev libproj-dev libgeos-dev
           sudo apt-get install -y libudunits2-dev
 
-      - name: Restore R packages from renv.lock
-        env:
-          GITHUB_PAT: ${{ secrets.PAT_TOKEN }}
-        run: Rscript -e 'renv::restore(prompt = FALSE)'
-          
 
       - name: Run prediction script
         run: Rscript scripts/daily_prediction.R "${{ matrix.forecast_date }}"
