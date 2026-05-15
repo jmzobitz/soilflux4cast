@@ -35,12 +35,6 @@ stage1 <-
   arrow::s3_bucket(endpoint_override = endpoint, anonymous = TRUE) |>
   arrow::open_dataset()
 
-cat("\n==== STAGE1 NAMES ====\n")
-print(names(stage1))
-
-cat("\n==== STAGE1 SCHEMA ====\n")
-print(stage1$schema)
-
 
 env_vars <- c("PRES","TSOIL", "SOILW", "WEASD", "SNOD","ICETK")
 
