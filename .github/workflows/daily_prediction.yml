@@ -79,6 +79,17 @@ jobs:
           r-version: '4.5.0'
           use-public-rspm: true
 
+      - name: Cache renv library
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.local/share/renv
+            renv/library
+          key: ${{ runner.os }}-renv-${{ hashFiles('renv.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-renv-
+
+
       - name: Install system dependencies for terra
         run: |
           sudo apt-get update
@@ -94,10 +105,10 @@ jobs:
             install.packages("renv", repos = "https://cloud.r-project.org")
 
             # Activate project explicitly
-            source("renv/activate.R")
+            renv::load()
 
             # Restore EVERYTHING from lockfile
-            renv::restore(prompt = FALSE, clean = TRUE)
+            renv::restore(prompt = FALSE, clean = TRUE, rebuild = FALSE)
 
             # HARD CHECK (this is what you were missing)
             stopifnot(requireNamespace("readr", quietly = TRUE))
