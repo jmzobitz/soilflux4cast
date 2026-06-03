@@ -145,13 +145,12 @@ jobs:
       - name: Restore R packages and Run
         env:
           GITHUB_PAT: ${{ secrets.PAT_TOKEN }}
-          NEON_TOKEN: ${{ secrets.NEON_TOKEN }}
+
         run: |
           Rscript -e "
             install.packages('renv', repos='https://cloud.r-project.org');
             source('renv/activate.R');
-            renv::restore(packages = c('tidyverse','neonUtilities','neonSoilFlux','zoo','remotes'), prompt = FALSE);
-            remotes::install_github('jmzobitz/neonSoilFlux',ref = 'May26-revisions'); # Install test version
+            renv::restore(packages = c('tidyverse','neonUtilities','neonSoilFlux','zoo'), prompt = FALSE);
           "
           
 
