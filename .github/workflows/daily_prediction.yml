@@ -70,28 +70,36 @@ jobs:
         forecast_date: ${{ fromJson(needs.determine-dates.outputs.date_list) }}
 
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up R
-        uses: r-lib/actions/setup-r@v2
+      - uses: r-lib/actions/setup-r@v2
         with:
           r-version: '4.5.0'
-
-      - name: Install system dependencies for terra
+          
+      - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libgdal-dev libproj-dev libgeos-dev
-          sudo apt-get install -y libudunits2-dev
 
-      - name: Restore packages
+      - name: Cache R packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.local/share/renv
+          key: ${{ runner.os }}-renv-${{ hashFiles('**/renv.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-renv-
+
+      - name: Restore R packages and Run
         env:
           GITHUB_PAT: ${{ secrets.PAT_TOKEN }}
+          NEON_TOKEN: ${{ secrets.NEON_TOKEN }}
         run: |
           Rscript -e '
             install.packages("renv", repos="https://cloud.r-project.org")
             source("renv/activate.R")
-            renv::restore(prompt = FALSE)
+            renv::restore(packages = c("tidyverse", "neonUtilities","neonSoilFlux","zoo","remotes"), prompt = FALSE)
+            remotes::install_github("jmzobitz/neonSoilFlux",ref = "May26-revisions"); # Install test version
+            
           '
 
       - name: Verify packages
