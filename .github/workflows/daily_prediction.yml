@@ -107,6 +107,7 @@ jobs:
 
             cat("\n--- library paths ---\n")
             print(.libPaths())
+          '
         
       - name: Run prediction script
         run: Rscript scripts/daily_prediction.R "${{ matrix.forecast_date }}"
