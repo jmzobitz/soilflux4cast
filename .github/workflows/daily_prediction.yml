@@ -94,10 +94,10 @@ jobs:
             renv::restore(prompt = FALSE)
           '
 
-       - name: Verify packages
-          run: |
-            Rscript -e 'library(readr); packageVersion("readr")'
-            Rscript -e 'print(.libPaths())'         
+      - name: Verify packages
+        run: |
+          Rscript -e 'library(readr); packageVersion("readr")'
+          Rscript -e 'print(.libPaths())'         
           
       - name: Check renv status
         run: Rscript -e 'renv::status()'
