@@ -332,29 +332,25 @@ compute_xgboost <- function(input_param_data,input_eval_data) {
     
     # Convert to matrix
     X <- input_param_data |> 
-      select(TSOIL,SOILW) |>
-      as.matrix()
+      select(TSOIL,SOILW)
     
-    Y <- input_param_data |> pull(flux)
+    Y <- input_param_data |> select(flux)
     
-    
-    dtrain <- xgb.DMatrix(data = X, label = Y)
     
     model <- xgboost(
-      data = dtrain,
+      x = X,
+      y = Y,
       objective = "reg:squarederror",
       max_depth = 3,
-      eta = 0.1,
-      nrounds = 200,
-      verbose = 0
+      learning_rate = 0.1,
+      nrounds = 200
     )
     
-    sigma_ps <- sd(getinfo(dtrain, "label") - predict(model, dtrain))
+    sigma_ps <- sd(pull(Y) - predict(model, X))
 
     
     eval_matrix <- input_eval_data |>
-      select(TSOIL,SOILW) |>
-      as.matrix()
+      select(TSOIL,SOILW)
     
     # Predictions
     input_eval_data$value <- predict(model, eval_matrix) + rnorm(1,mean=0,sd=sigma_ps)

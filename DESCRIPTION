@@ -2,9 +2,6 @@ Package: package
 Version: 0.1.0
 Depends:
     R (>= 4.5.0)
-    
 Imports:
     neon4cast
-    
-    
 Remotes: github::eco4cast/neon4cast
