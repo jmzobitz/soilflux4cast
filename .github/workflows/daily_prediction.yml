@@ -79,15 +79,15 @@ jobs:
           r-version: '4.5.0'
           use-public-rspm: true
 
-      - name: Cache renv library
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.local/share/renv
-            renv/library
-          key: ${{ runner.os }}-renv-${{ hashFiles('renv.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-renv-
+#      - name: Cache renv library
+#        uses: actions/cache@v4
+#        with:
+#          path: |
+#            ~/.local/share/renv
+#            renv/library
+#          key: ${{ runner.os }}-renv-${{ hashFiles('renv.lock') }}
+#          restore-keys: |
+#            ${{ runner.os }}-renv-
 
 
       - name: Install system dependencies
@@ -104,6 +104,13 @@ jobs:
             libgit2-dev \
             pandoc \
             cmake
+
+      - name: Inspect lockfile
+        run: |
+          ls -l renv.lock
+          head -50 renv.lock
+          grep -n "neon4cast" renv.lock || true
+          grep -n "rMR" renv.lock || true
 
       - name: Restore packages (renv)
         env:
