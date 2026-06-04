@@ -90,34 +90,40 @@ jobs:
             ${{ runner.os }}-renv-
 
 
-      - name: Install system dependencies for terra
+      - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgdal-dev libproj-dev libgeos-dev
-          sudo apt-get install -y libudunits2-dev
+          sudo apt-get install -y \
+            libgdal-dev \
+            libproj-dev \
+            libgeos-dev \
+            libudunits2-dev \
+            libuv1-dev \
+            libfontconfig1-dev \
+            libfreetype6-dev \
+            libgit2-dev \
+            pandoc \
+            cmake
 
-      - name: Restore packages
+      - name: Restore packages (renv)
         env:
           GITHUB_PAT: ${{ secrets.PAT_TOKEN }}
-          RENV_CONFIG_REPOS_OVERRIDE: https://cloud.r-project.org
         run: |
           Rscript -e '
             install.packages("renv", repos = "https://cloud.r-project.org")
 
-            # Activate project explicitly
-            renv::load()
+            source("renv/activate.R")
 
-            # Restore EVERYTHING from lockfile
-            renv::restore(prompt = FALSE, clean = TRUE, rebuild = FALSE)
+            # IMPORTANT: do NOT rebuild everything unless needed
+            renv::restore(prompt = FALSE, clean = FALSE, rebuild = FALSE)
 
-            # HARD CHECK (this is what you were missing)
+            # sanity check only for what job actually needs
             stopifnot(requireNamespace("readr", quietly = TRUE))
+            stopifnot(requireNamespace("dplyr", quietly = TRUE))
 
-            cat("\n--- renv status ---\n")
             print(renv::status())
-
-            cat("\n--- library paths ---\n")
             print(.libPaths())
+          '
           '
         
       - name: Run prediction script
