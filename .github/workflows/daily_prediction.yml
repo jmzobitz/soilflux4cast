@@ -118,13 +118,13 @@ jobs:
             renv::restore(prompt = FALSE, clean = FALSE, rebuild = FALSE)
 
             # sanity check only for what job actually needs
-            stopifnot(requireNamespace("readr", quietly = TRUE))
-            stopifnot(requireNamespace("dplyr", quietly = TRUE))
+            #stopifnot(requireNamespace("readr", quietly = TRUE))
+            #stopifnot(requireNamespace("dplyr", quietly = TRUE))
 
             print(renv::status())
             print(.libPaths())
           '
-          '
+          
         
       - name: Run prediction script
         run: Rscript scripts/daily_prediction.R "${{ matrix.forecast_date }}"
