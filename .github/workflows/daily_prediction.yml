@@ -131,8 +131,7 @@ jobs:
 
         
       - name: Run prediction script
-        run: |
-          Rscript -e 'source("renv/activate.R"); source("scripts/daily_prediction.R")' "${{ matrix.forecast_date }}"
+        run: R_PROFILE_USER=.Rprofile Rscript scripts/daily_prediction.R "${{ matrix.forecast_date }}"
 
 
         
