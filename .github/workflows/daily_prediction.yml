@@ -102,8 +102,12 @@ jobs:
             libfontconfig1-dev \
             libfreetype6-dev \
             libgit2-dev \
+            gdal-bin \
+            libabsl-dev \
+            libx11-dev \
             pandoc \
             cmake
+
 
       - name: Inspect lockfile
         run: |
@@ -123,15 +127,8 @@ jobs:
 
             # IMPORTANT: do NOT rebuild everything unless needed
             renv::restore(prompt = FALSE, clean = FALSE, rebuild = FALSE)
+            '
 
-            # sanity check only for what job actually needs
-            #stopifnot(requireNamespace("readr", quietly = TRUE))
-            #stopifnot(requireNamespace("dplyr", quietly = TRUE))
-
-            print(renv::status())
-            print(.libPaths())
-          '
-          
         
       - name: Run prediction script
         run: Rscript scripts/daily_prediction.R "${{ matrix.forecast_date }}"
