@@ -80,6 +80,15 @@ jobs:
         run: Rscript -e 'renv::restore(prompt = FALSE)'
           
 
+      - name: Install neon4cast from GitHub
+        env:
+          GITHUB_PAT: ${{ secrets.PAT_TOKEN }}
+        run: |
+          Rscript -e '
+            if (!requireNamespace("remotes", quietly = TRUE)) install.packages("remotes", repos = "https://cloud.r-project.org")
+            remotes::install_github("eco4cast/neon4cast")
+            '
+
       - name: Run prediction script
         run: Rscript scripts/daily_prediction_horizon.R "${{ matrix.forecast_date }}"
 

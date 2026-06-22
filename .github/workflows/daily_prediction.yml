@@ -130,6 +130,15 @@ jobs:
             '
 
         
+      - name: Install neon4cast from GitHub
+        env:
+          GITHUB_PAT: ${{ secrets.PAT_TOKEN }}
+        run: |
+          Rscript -e '
+            if (!requireNamespace("remotes", quietly = TRUE)) install.packages("remotes", repos = "https://cloud.r-project.org")
+            remotes::install_github("eco4cast/neon4cast")
+            '
+
       - name: Run prediction script
         run: R_PROFILE_USER=.Rprofile Rscript scripts/daily_prediction.R "${{ matrix.forecast_date }}"
 
