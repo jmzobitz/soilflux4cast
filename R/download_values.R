@@ -59,5 +59,16 @@ download_values <- function(variable = "drivers", year, month = NULL) {
     dplyr::select(data) |>
     tidyr::unnest(cols = c(data))
   
+  if(variable == "targets" ) {
+    variables_out <- variables_out |>
+      dplyr::rename(datetime=startDateTime)
+  }
+  
+  if(variable == "soil-env" ) {
+    variables_out <- variables_out |>
+      dplyr::rename(datetime=startDateTime)
+  }
+  
+  
   return(variables_out)
 }
