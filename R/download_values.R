@@ -66,7 +66,10 @@ download_values <- function(variable = "drivers", year, month = NULL) {
   
   if(variable == "soil-env" ) {
     variables_out <- variables_out |>
-      dplyr::rename(datetime=startDateTime)
+      dplyr::rename(datetime=startDateTime,
+                    TSOIL = SOILT,
+                    SOILW = VSWC
+                    )
   }
   
   
