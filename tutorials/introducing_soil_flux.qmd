@@ -366,7 +366,7 @@ fx_unde_out |>
     y = "Soil Flux (gC/m2/d)"
   )
 ```
-As expected, the forecast ensemble increasing the further we are from the forecast date. 
+As expected, the forecast ensemble increases the further we are from the forecast date. 
 
 How did our forecast perform? Because we did a hindcast, we can evaluate the performance of the forecast:
 
@@ -457,7 +457,7 @@ The following code will Report the percentage of predictions that fell within th
 ```{r}
 # Nest by the day and site, join the measured targets, and then compute the crps and summary statistics
 
-# Since we are doing an ensem
+# Since we are doing an ensemble
 fx_unde_summary <- fx_unde_out |>
   mutate(datetime = floor_date(datetime, unit = "day")) |>
   group_by(datetime, site_id) |>

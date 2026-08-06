@@ -435,8 +435,8 @@ fx_unde_out |>
 
 ![](introducing_soil_flux_files/figure-commonmark/unnamed-chunk-13-1.png)
 
-As expected, the forecast ensemble increasing the further we are from
-the forecast date.
+As expected, the forecast ensemble increases the further we are from the
+forecast date.
 
 How did our forecast perform? Because we did a hindcast, we can evaluate
 the performance of the forecast:
@@ -535,7 +535,7 @@ within the 90% CI (reliability):
 ``` r
 # Nest by the day and site, join the measured targets, and then compute the crps and summary statistics
 
-# Since we are doing an ensem
+# Since we are doing an ensemble
 fx_unde_summary <- fx_unde_out |>
   mutate(datetime = floor_date(datetime, unit = "day")) |>
   group_by(datetime, site_id) |>
@@ -560,7 +560,7 @@ fx_unde_summary <- fx_unde_out |>
 
 # Report the percentage of predictions that fell within the 90% CI (reliability):
 fx_unde_summary |>
-  summarize(reliability = sum(within_TRUE) / n())
+  summarize(reliability = mean(within_TRUE))
 ```
 
     # A tibble: 1 × 1
