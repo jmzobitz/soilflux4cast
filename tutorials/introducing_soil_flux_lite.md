@@ -14,11 +14,12 @@ John Zobitz
 
 ## Prerequisites
 
-This module assumes you are:
+This module assumes you:
 
-1.  Experienced working with creating and evaluating ecological
+1.  Have experience working with creating and evaluating ecological
     forecasts.
-2.  Understand what soil carbon fluxes are.
+2.  Understand what soil carbon fluxes are and how NEON measures data to
+    compute soil carbon fluxes.
 3.  Have experience working with `R` and `tidyverse`.
 
 This tutorial utilizes the [`soilflux4cast` github
@@ -152,8 +153,8 @@ package](https://projects.ecoforecast.org/neon4cast-docs/Shared-Forecast-Drivers
 ## Targets
 
 The target is a daily total soil flux of carbon (gC m<sup>-2</sup>
-d<sup>-1</sup>) derived from half hourly estimates using the
-[`neonSoilFlux` `R`
+d<sup>-1</sup>) derived from half-hourly computed soil carbon fluxes
+with the [`neonSoilFlux` `R`
 package](https://cran.r-project.org/web/packages/neonSoilFlux/index.html)
 and associated publication
 [LINK](https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210x.70216).
@@ -173,7 +174,7 @@ download_values(
 The output has the following variables:
 
 - `site_id`: string : NEON site ID
-- `startDateTime`: timestamp\[us, tz=UTC\]: datetime of forecast
+- `datetime`: timestamp\[us, tz=UTC\]: datetime of forecast
 - `flux`: daily soil carbon flux \[gC/m2/d\]
 - `flux_err`: daily soil carbon flux uncertainty \[gC/m2/d\]
 

@@ -1,4 +1,4 @@
-# Introduction to soil flux forecasting
+# Introduction to soil flux forecasting - scaffolded (guided tutorial)
 John Zobitz
 
 # Theme: Soil fluxes
@@ -14,51 +14,70 @@ John Zobitz
 
 ## Prerequisites
 
-This module requires a working understanding of soil fluxes, ecological
-forecasting, and data science skills in `R`. Unsure about where to
-begin? Here are some resources for you:
+This module assumes you:
 
-### Soil fluxes
+1.  Know what an ecological forecast is.
+2.  Have worked in developing forecasts and evaluating forecasts.
+3.  Have an emerging understanding of soil carbon fluxes are and know
+    what the National Ecological Observatory Network (NEON) is.
+4.  Have experience working with `R` and `tidyverse`.
 
-- [Modeling soil fluxes with NEON
-  data](https://qubeshub.org/publications/4774/1)
+This tutorial utilizes the [`soilflux4cast` github
+repository](https://github.com/jmzobitz/soilflux4cast), which I
+anticipate developing further into a standalone `R` package.
 
-### Data science skills
+### Libraries
 
-- [Modern Data Science with R](https://mdsr-book.github.io/mdsr3e/)
-- [R for Data Science](https://r4ds.hadley.nz/)
-- [Environmental Data Science](https://jmzobitz.github.io/eds-text/)
-  *work in progress*
+To run this tutorial you will need the following R packages / libraries
+and where they are utilized in the `soilflux4cast` functions:
 
-### Ecological forecasting
+- `tidyverse` (data wrangling)
+- `jsonlite` (accessing github files)
+- `devtools` (sourcing from a github repo)
+- `glue` (file name pasting)
+- `arrow` (file storage)
+- `terra` (downloading forecasts)
+- `sf` (downloading forecasts)
 
-- [Introduction to ecological
-  forecasting](https://serc.carleton.edu/eddie/teaching_materials/modules/module5.html)
-- [Understanding uncertainty in ecological
-  forecasts](https://serc.carleton.edu/eddie/teaching_materials/modules/module6.html)
-- [Using data to understand ecological
-  forecasts](https://serc.carleton.edu/eddie/teaching_materials/modules/module7.html)
-- [A Practical Guide to Ecosystem
-  Forecasting](https://frec-5174.github.io/eco4cast-in-R-book/)
+As a reminder, if you need to install packages into your `R` library,
+use `install.packages("PACKAGE_NAME")` at the command line.
+
+## About `soilflux4cast`
+
+The [`soilflux4cast` github
+repository](https://github.com/jmzobitz/soilflux4cast) provides the
+following:
+
+- **Drivers**: historical soil environmental driver data at each of the
+  47 terrestrial NEON sites. These data are used for forecast
+  parameterization. Historical driver data for the previous month are
+  computed at the start of each month using a github action. Extends
+  from 2022-01 to present. Stored as `csv` files.
+- **Targets**: historical daily average soil fluxes at each of the
+  terrestrial NEON sites. Computed with a github action on the 15th of
+  each month, following a provisional NEON data release. Extends from
+  2017-01 to present. Stored as `csv` files.
 
 ## Preliminaries
 
 This tutorial requires the following packages installed on your local
-`R` installation:
+`R` installation. We may not use all of the libraries in the examples
+below - but some libraries are embedded within functions in
+`soilflux4cast` that you will be using:
 
 ``` r
 # load up the packages
-library(tidyverse)
-library(glue)
-library(arrow)
-library(terra)
-library(sf)
+library(tidyverse) # data wrangling
+library(jsonlite) # accessing github files
+library(devtools) # sourcing from a github repo
+library(glue) # file name pasting
+library(arrow) # file storage
+library(terra) # downloading forecasts
+library(sf) # downloading forecasts
 ```
 
-Similarly, we will be using functions from the [`soilflux4cast` github
-repository](https://github.com/jmzobitz/soilflux4cast). Since this is a
-package in development, the following code will allow you to grab the
-functions you need directly from github:
+Run the following code to acquire the locally store functions that will
+allow you to acquire driver and target data:
 
 ``` r
 # Helper function to source from your specific repo
@@ -70,17 +89,14 @@ source_github <- function(file_name) {
 # Now you can source any file by name
 source_github("R/download_values.R")
 source_github("R/noaa_soil_drivers.R")
-source_github("R/noaa_soil_drivers.R")
 ```
 
 ## Drivers
 
 Driver variables are provided by NOAA’s Global Ensemble Forecasting
-System. There are several aboveground driver variables available through
-the [`neon4cast`
-package](https://projects.ecoforecast.org/neon4cast-docs/Shared-Forecast-Drivers.html).
-
-In addition to these, we have pre-selected [additional driver
+System, acquired through the [`gefs4cast` github
+repository](https://github.com/eco4cast/gefs4cast). Notably for this
+project, we have pre-selected NOAA GEFS [driver
 variables](https://www.nco.ncep.noaa.gov/pmb/products/gens/gec00.t00z.pgrb2a.0p50.f000.shtml)
 that are known to influence soil surface fluxes:
 
@@ -97,36 +113,17 @@ issue](https://github.com/jmzobitz/soilflux4cast/issues).
 
 ### Historical (Stage 3) drivers
 
-We provide historical (observed) driver variables listed above at each
-of the terrestrial NEON sites. This is analgous to the
-`neon4cast::noaa_stage3()` function for the [NEON Ecological Forecasting
-challenges](https://projects.ecoforecast.org/neon4cast-docs/Shared-Forecast-Drivers.html#stage-3).
-These observed values are computed at the beginning of a calendar month
-and stored in the `soilflux4cast` github.
-
-The general purpose function `download_values` is used to acquire across
-all terrestrial NEON sites. For example to get the drivers from April
-2025:
+The function `download_values` is used to acquire across all terrestrial
+NEON sites. For example to get the drivers from April 2025:
 
 ``` r
 download_values(
-  variable = "drivers",
+  variable = "drivers", # environmental variables
   year = "2025",
-  month = "04"  # optional - you can omit if you want values for the entire year
-  ) |> 
-  glimpse()
+  month = "04" # optional - you can omit if you want values for the entire year
+) |>
+  dplyr::glimpse()
 ```
-
-    Rows: 1,410
-    Columns: 8
-    $ site_id  <chr> "ABBY", "BARR", "BART", "BLAN", "BONA", "CLBJ", "CPER", "DCFS…
-    $ datetime <dttm> 2025-04-01, 2025-04-01, 2025-04-01, 2025-04-01, 2025-04-01, …
-    $ PRES     <dbl> 95927.55, 100442.15, 94387.95, 98737.75, 97159.55, 97598.75, …
-    $ TSOIL    <dbl> 277.1413, NA, 274.2575, 286.8138, 268.4338, 288.8163, 282.670…
-    $ SOILW    <dbl> 0.280000, NA, 0.367000, 0.294500, 0.435625, 0.166500, 0.19500…
-    $ WEASD    <dbl> 1.750, 71.875, 3.875, 0.000, 36.125, 0.000, 0.000, 1.250, 30.…
-    $ SNOD     <dbl> 0.00750, 0.22000, 0.02375, 0.00000, 0.28625, 0.00000, 0.00000…
-    $ ICETK    <dbl> 0.00, 1.18, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0…
 
 The output has the following variables:
 
@@ -141,44 +138,33 @@ The output has the following variables:
 - `SNOD`: prediction of Snow Depth \[m\]
 - `ICETK`: prediction of Ice Thickness \[m\]
 
-### Ensemble forecasts (Stage 1)
+The output from `download_values` is similar to the
+`neon4cast::noaa_stage3()` function for the [NEON Ecological Forecasting
+challenges](https://projects.ecoforecast.org/neon4cast-docs/Shared-Forecast-Drivers.html#stage-3).
+These observed values are computed at the beginning of a calendar month
+and stored in the `soilflux4cast` github through github actions.
+
+### Ensemble forecasts for driver vairables (Stage 1)
 
 For a single forecast date, we provide ensemble forecasts for each of
 the driver variables listed above at each of the terrestrial NEON sites.
 At each site, 31 ensemble member forecasts are provided at 3 hr
 intervals for the first 10 days, and 6 hr intervals for up to 35 days
-(840 hr horizon). This is analgous to the `neon4cast::noaa_stage3()`
-function for the [NEON Ecological Forecasting
-challenges](https://projects.ecoforecast.org/neon4cast-docs/Shared-Forecast-Drivers.html#stage-1).
-
-The general function `noaa_soil_drivers` is used to acquire ensemble
-GEFS forecasts for driver variables at a given forecast date. For
-example, the forecast drivers is the following:
+(840 hr horizon) using the function `noaa_soil_drivers`for a given
+forecast date:
 
 ``` r
 noaa_soil_drivers(
-  forecast_date = "2025-05-01"
-  ) |>
-  glimpse()
+  forecast_date = "2025-05-01",
+  # site = 'UNDE'   # optional to specify a given NEON site
+) |>
+  dplyr::glimpse()
 ```
 
-    Rows: 263,717
-    Columns: 12
-    $ ensemble <chr> "gec00", "gec00", "gec00", "gec00", "gec00", "gec00", "gec00"…
-    $ cycle    <chr> "00", "00", "00", "00", "00", "00", "00", "00", "00", "00", "…
-    $ horizon  <drtn> 10800 secs, 43200 secs, 21600 secs, 32400 secs, 54000 secs, …
-    $ datetime <dttm> 2025-05-01 03:00:00, 2025-05-01 12:00:00, 2025-05-01 06:00:0…
-    $ family   <chr> "ensemble", "ensemble", "ensemble", "ensemble", "ensemble", "…
-    $ site_id  <chr> "ABBY", "ABBY", "ABBY", "ABBY", "ABBY", "ABBY", "ABBY", "ABBY…
-    $ PRES     <dbl> 97010.22, 96931.24, 97030.98, 96970.62, 96817.62, 96718.55, 9…
-    $ TSOIL    <dbl> 282.6268, 281.0460, 282.1822, 281.5460, 281.0460, 282.9460, 2…
-    $ SOILW    <dbl> 0.228, 0.226, 0.227, 0.226, 0.225, 0.222, 0.215, 0.218, 0.214…
-    $ WEASD    <dbl> 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0…
-    $ SNOD     <dbl> 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0…
-    $ ICETK    <dbl> 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0…
+An optional input `site` will only acquire forecasts at a given
+terrestrial NEON site, which can speed time up.
 
-An option input `site` will only acquire forecasts at a given
-terrestrial NEON site. The output has the following variables:
+The output has the following variables:
 
 - `ensemble`: int32 : ensemble member number
 - `cycle`: string: hour of day that forecast was started
@@ -195,71 +181,75 @@ terrestrial NEON site. The output has the following variables:
 - `SNOD`: prediction of Snow Depth \[m\]
 - `ICETK`: prediction of Ice Thickness \[m\]
 
+The output from `noaa_soil_drivers` is analgous to the
+`neon4cast::noaa_stage3()` function for the [NEON Ecological Forecasting
+challenges](https://projects.ecoforecast.org/neon4cast-docs/Shared-Forecast-Drivers.html#stage-1).
+Other aboveground driver variables are available through the
+[`neon4cast`
+package](https://projects.ecoforecast.org/neon4cast-docs/Shared-Forecast-Drivers.html).
+
 ## Targets
 
 The target is a daily total soil flux of carbon (gC m<sup>-2</sup>
-d<sup>-1</sup>) derived from half hourly estimates using the
-[`neonSoilFlux` `R`
+d<sup>-1</sup>) derived from half-hourly computed soil carbon fluxes
+with the [`neonSoilFlux` `R`
 package](https://cran.r-project.org/web/packages/neonSoilFlux/index.html)
 and associated publication
 [LINK](https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210x.70216).
-When NEON data are release on the 15th of each month, the
-`soilflux4cast` package computes daily values for the month previous and
-stores the data in the `data/targets` on the repository as flat `csv`
-files.
 
 These targets are also accessible through the `download_values`
-function, setting the `variables` input to `targets`:
+function:
 
 ``` r
 download_values(
   variable = "targets",
   year = "2025",
-  month = "04"  # optional - you can omit if you want values for the entire year
-  ) |> 
-  glimpse()
+  month = "04" # optional - you can omit if you want values for the entire year
+) |>
+  dplyr::glimpse()
 ```
-
-    Rows: 870
-    Columns: 4
-    $ site_id       <chr> "ABBY", "ABBY", "ABBY", "ABBY", "ABBY", "ABBY", "ABBY", …
-    $ startDateTime <dttm> 2025-04-01, 2025-04-02, 2025-04-03, 2025-04-04, 2025-04…
-    $ flux          <dbl> 5.303161, 5.488887, 5.633163, 5.354312, 5.213107, 5.2425…
-    $ flux_err      <dbl> 0.016582965, 0.017143447, 0.017626872, 0.016728931, 0.01…
 
 The output has the following variables:
 
 - `site_id`: string : NEON site ID
-- `startDateTime`: timestamp\[us, tz=UTC\]: datetime of forecast
+- `datetime`: timestamp\[us, tz=UTC\]: datetime of forecast
 - `flux`: daily soil carbon flux \[gC/m2/d\]
 - `flux_err`: daily soil carbon flux uncertainty \[gC/m2/d\]
 
-## Models
+Now you are ready to develop a model and forecast!
 
-All modeling approaches are welcome! This tutorial will take you through
-developing a simple forecast using a linear model with the covariates at
-the UNDE NEON Site.
+## Case study: construcing an empirical model at a NEON site
 
-First lets acquire the driver variables to see what soil flux is like,
-we’ll use `dplyr` function `filter` to just examine the [NEON
-UNDE](https://www.neonscience.org/field-sites/unde) site:
+Let’s develop a simple forecast using a linear model with environmental
+covariates from a NEON Site.
+
+We will parameterize a model to predict soil fluxes using simple linear
+regression. The model will have the form
+$R_{S} = a_{0} + a_{1} T_{S} + a_{2} SOILW$, where $R_{S}$ is soil flux,
+$T_{S}$ is soil temperature, $SOILW$ soil water content.
+
+First let’s acquire the driver variables to see what soil flux is like
+at the [NEON UNDE](https://www.neonscience.org/field-sites/unde) site in
+April 2024. We’ll use the `dplyr` function `filter` to just examine the
+data at UNDE.
 
 ``` r
 drivers <- download_values(
   variable = "drivers",
   year = "2025",
-  month = "04"  # optional - you can omit if you want values for the entire year
-  )
+  month = "04" # optional - you can omit if you want values for the entire year
+)
 
 # Get drivers for UNDE site:
 unde_drivers <- drivers |>
-  filter(site_id == "UNDE")
+  filter(site_id == "UNDE") |>
+  select(site_id, datetime, TSOIL, SOILW)
 
-# Plot the drivers separately. 
+# Plot the drivers separately.
 
 # Note that TSOIL is in Kelvin
 unde_drivers |>
-  ggplot(aes(x=datetime,y=TSOIL)) +
+  ggplot(aes(x = datetime, y = TSOIL)) +
   geom_line() +
   geom_point() +
   theme_minimal()
@@ -269,8 +259,7 @@ unde_drivers |>
 
 ``` r
 unde_drivers |>
-  pivot_longer(cols=c("SOILW")) |>
-  ggplot(aes(x=datetime,y=TSOIL)) +
+  ggplot(aes(x = datetime, y = SOILW)) +
   geom_line() +
   geom_point() +
   theme_minimal()
@@ -285,52 +274,134 @@ Next let’s take a look at the targets across this same time frame:
 targets <- download_values(
   variable = "targets",
   year = "2025",
-  month = "04"  # optional - you can omit if you want values for the entire year
-  ) 
+  month = "04" # optional - you can omit if you want values for the entire year
+)
 
 # Filter the targets so you have just the UNDE NEON site:
 unde_targets <- targets |>
   filter(site_id == "UNDE")
 
 unde_targets |>
-  ggplot(aes(x=startDateTime,y=flux)) +
+  ggplot(aes(x = datetime, y = flux)) +
   geom_line() +
   geom_point() +
-  ylab('Soil CO2 flux (gC/m2/d)') +
+  ylab("Soil CO2 flux (gC/m2/d)") +
   theme_minimal()
 ```
 
 ![](introducing_soil_flux_files/figure-commonmark/unnamed-chunk-7-1.png)
-
-Now we are going to parameterize a model to predict soil fluxes using
-simple linear regression. The model will have the form
-$R_{S} = a_{0} + a_{1} T_{S} + a_{2} SWC$, where $T_{S}$ is soil
-temperature, $SWC$ soil water content.
 
 To parameterize the model will require some data wrangling, first by
 joining the drivers and targets together.
 
 ``` r
 # Join the targets and drivers together
-joined_unde <-  unde_targets |>
-  inner_join(unde_drivers, by=c("site_id","startDateTime"="datetime")) |> 
-  drop_na()  # Remove any NA values to avoid errors when fitting.
+joined_unde <- unde_targets |>
+  inner_join(unde_drivers, by = c("site_id", "datetime")) |>
+  drop_na() # Remove any NA values to avoid errors when fitting.
 
-# Compute the model 
-lm_fit <- lm(flux~SOILW+TSOIL,data=joined_unde)  # Parameterize the model
-coeff <- lm_fit |> broom::tidy()  # Extract the coefficients
-sigma <- sd(lm_fit$residuals)  # Our modeling error
+# Compute the model
+lm_fit <- lm(flux ~ SOILW + TSOIL, data = joined_unde) # Parameterize the model
+coeff <- lm_fit |> broom::tidy() # Extract the coefficients
+sigma <- sd(lm_fit$residuals) # Our modeling error
 ```
 
-Now let’s make a prediction for the next day with our forecast:
+Now let’s make a prediction for the next day with our forecast. First
+let’s get our forecast drivers and plot those:
 
 ``` r
 # Acquire the drivers for May 1.
 fx_drivers_unde <- noaa_soil_drivers(
   forecast_date = "2025-05-01",
   site = "UNDE"
-  )
+)
 
+fx_drivers_unde |>
+  pivot_longer(cols = c("TSOIL", "SOILW"), names_to = "variable") |>
+  ggplot(aes(x = datetime, y = value, group = ensemble)) +
+  geom_line(alpha = 0.2, color = "steelblue") +
+  facet_wrap(~variable, scales = "free_y", ncol = 2) +
+  theme_minimal() +
+  labs(
+    title = "Raw forecast drivers at UNDE for forecast starting 2025-05-01",
+    x = NULL, y = NULL
+  )
+```
+
+![](introducing_soil_flux_files/figure-commonmark/unnamed-chunk-9-1.png)
+
+It may be better to show a confidence interval rather than each ensmeble
+member. We will need to do some data wrangling to get the average soil
+temperature and soil water each day with the following workflow:
+
+1.  Use `floor_date` to determine each day (as a categorical variable)
+2.  For each day, compute the the 10%, 50%, and 90% percential across
+    each environmental driver.
+3.  Pivot into a tall data table for easier plotting.
+
+``` r
+fx_drivers_unde_day <- fx_drivers_unde |>
+  mutate(datetime = floor_date(datetime, unit = "day")) |>
+  group_by(datetime) |>
+  summarize(
+    across(
+      c("TSOIL", "SOILW"),
+      list(
+        q10  = ~ quantile(.x, 0.10, na.rm = TRUE),
+        q50  = ~ quantile(.x, 0.50, na.rm = TRUE),
+        q90  = ~ quantile(.x, 0.90, na.rm = TRUE)
+      ),
+      .names = "{.col}___{.fn}"
+    ),
+    .groups = "drop"
+  ) |>
+  pivot_longer(
+    cols = -datetime,
+    names_to = c("variable", ".value"),
+    names_sep = "___"
+  ) |>
+  mutate(period = "Forecast (ensemble)")
+```
+
+Now we will the drivers used to parameterize the model with the ensemble
+from the forecast drivers:
+
+``` r
+unde_drivers_long <- unde_drivers |>
+  pivot_longer(
+    cols = c("TSOIL", "SOILW"),
+    names_to = "variable",
+    values_to = "q50"
+  ) |>
+  mutate(period = "Training (observed)")
+
+ggplot() +
+  geom_ribbon(
+    data = fx_drivers_unde_day,
+    aes(x = datetime, ymin = q10, ymax = q90),
+    fill = "black", alpha = 0.15
+  ) +
+  geom_line(data = unde_drivers_long, aes(x = datetime, y = q50, color = period)) +
+  geom_line(data = fx_drivers_unde_day, aes(x = datetime, y = q50, color = period)) +
+  scale_color_manual(
+    name = NULL,
+    values = c("Training (observed)" = "steelblue", "Forecast (ensemble)" = "black")
+  ) +
+  facet_wrap(~variable, scales = "free_y", ncol = 2) +
+  theme_minimal() +
+  theme(legend.position = "bottom") +
+  labs(
+    title = "Driver comparison: training (2025-04) vs. forecast (2025-05) at UNDE",
+    x = NULL, y = NULL
+  )
+```
+
+![](introducing_soil_flux_files/figure-commonmark/unnamed-chunk-11-1.png)
+
+Similarly, we will use each of the ensemble members to forecast soil
+flux one month ahead.
+
+``` r
 # Now we are ready to predict with these forecast drivers
 # Create prediction matrix (include intercept by adding a column of 1)
 
@@ -338,60 +409,223 @@ X <- model.matrix(~ 1 + SOILW + TSOIL, data = fx_drivers_unde)
 
 # Set the model coefficients as a vector so we can predict.
 coeff_vec <- coeff |>
-    select(term,estimate) |>
-    deframe()
+  select(term, estimate) |>
+  deframe()
 
 # Calculate the predicted forecasts
 fx_unde_out <- fx_drivers_unde |>
-  mutate(prediction = ((X %*% coeff_vec)  |>
-    as.numeric() ))
+  mutate(prediction = ((X %*% coeff_vec) |>
+    as.numeric()))
 ```
 
 How did the forecasts do? Let’s take a look:
 
 ``` r
 fx_unde_out |>
-  ggplot(aes(x=datetime,y=prediction,group=ensemble)) + 
+  ggplot(aes(x = datetime, y = prediction, group = ensemble)) +
   geom_line() +
-  theme_minimal()
+  theme_minimal() +
+  labs(
+    title = "UNDE soil flux forecast members",
+    subtitle = "Forecast valid: 2025-05-01",
+    x = "Date",
+    y = "Soil Flux (gC/m2/d)"
+  )
 ```
 
-![](introducing_soil_flux_files/figure-commonmark/unnamed-chunk-10-1.png)
+![](introducing_soil_flux_files/figure-commonmark/unnamed-chunk-13-1.png)
 
-However the targets are computed as a daily value, so we might improve
-on things if we compute daily averages of the forecast driver variables
-first. While the workflow is the same, we will need to do some data
-wrangling to get the average soil temperature and soil water each day
-with the following workflow:
+As expected, the forecast ensemble increasing the further we are from
+the forecast date.
 
-1.  Use `floor_date` to determine each day (as a categorical variable)
-2.  For each `ensemble` and `datetime` compute the average soil
-    temperature and soil water.
-3.  Add in `reference_datetime` to know the date the forecast was
-    created.
-4.  Form your model matrix `X` and do the prediction.
+How did our forecast perform? Because we did a hindcast, we can evaluate
+the performance of the forecast:
 
 ``` r
-fx_drivers_unde_day <- fx_unde_out |>
-  mutate(datetime = floor_date(datetime,unit="day")) |>
-  group_by(ensemble,datetime) |>
-  summarize(TSOIL = mean(TSOIL,na.rm=TRUE),
-            SOILW = mean(SOILW,na.rm=TRUE)
-            ) |>
-  mutate(reference_datetime = as.POSIXct("2025-05-01") ) |>
+### Acquire targets for comparison (for the next month)
+targets_eval <- download_values(
+  variable = "targets",
+  year = "2025",
+  month = "05" # optional - you can omit if you want values for the entire year
+)
+
+# Just get the UNDE site
+unde_targets_eval <- targets_eval |>
+  filter(site_id == "UNDE")
+```
+
+Simliar to what we did with the drivers, let’s compare the following:
+
+- Observed soil flux in 2025-04 that was used to parametertize our
+  model.
+- Ensemble average of our soil flux forecasts.
+- Observed soil flux in 2025-05 for comparison.
+
+The following is a long `ggplot` code string, but it helps to put this
+all together.
+
+``` r
+# Compute the average ensemble values
+fx_unde_out_day <- fx_unde_out |>
+  mutate(datetime = floor_date(datetime, unit = "day")) |>
+  group_by(datetime) |>
+  summarize(
+    across(
+      c("prediction"),
+      list(
+        q10  = ~ quantile(prediction, 0.10, na.rm = TRUE),
+        q50  = ~ quantile(prediction, 0.50, na.rm = TRUE),
+        q90  = ~ quantile(prediction, 0.90, na.rm = TRUE)
+      ),
+      .names = "{.col}_{.fn}"
+    ),
+    .groups = "drop"
+  ) |>
+  mutate(period = "Forecast (ensemble)")
+
+# Now plot!
+ggplot() +
+  geom_ribbon(
+    data = fx_unde_out_day,
+    aes(x = datetime, ymin = prediction_q10, ymax = prediction_q90),
+    fill = "black", alpha = 0.2
+  ) +
+  geom_line(data = fx_unde_out_day, aes(x = datetime, y = prediction_q50, color = "Forecast (median)")) +
+  geom_point(data = unde_targets, aes(x = datetime, y = flux, color = "Training data (observed)")) +
+  geom_line(data = unde_targets, aes(x = datetime, y = flux, color = "Training data (observed)")) +
+  geom_point(data = unde_targets_eval, aes(x = datetime, y = flux, color = "Evaluation data (observed)")) +
+  geom_line(data = unde_targets_eval, aes(x = datetime, y = flux, color = "Evaluation data (observed)")) +
+  scale_color_manual(
+    name = NULL,
+    values = c(
+      "Training data (observed)" = "steelblue",
+      "Forecast (median)" = "black",
+      "Evaluation data (observed)" = "red"
+    )
+  ) +
+  theme_minimal() +
+  theme(legend.position = "bottom") +
+  xlab("Date") +
+  ylab("Soil Flux (gC/m2/d)") +
+  labs(
+    x = "Date",
+    y = "Soil Flux (gC/m2/d)",
+    title = "Training (2025/04) vs. forecast evaluation (2025/05) at UNDE",
+    subtitle = "Forecast valid: 2025-05-01"
+  )
+```
+
+![](introducing_soil_flux_files/figure-commonmark/unnamed-chunk-15-1.png)
+
+### Model evaluation
+
+How well did our model do? Some forecast evaluation metrics are: The
+following processing pipeline:
+
+1.  Groups the forecasts by `datetime` and `site_id`
+2.  Joins to the measured targets from that month.
+3.  Computes the [Continuous Rank Probability Score
+    (CRPS)](https://projects.ecoforecast.org/neon4cast-docs/Evaluation.html)
+    from the `scoringRules` package (because we have an ensemble).
+4.  Computes other summary statistics of the ensemble.
+
+The following code will Report the percentage of predictions that fell
+within the 90% CI (reliability):
+
+``` r
+# Nest by the day and site, join the measured targets, and then compute the crps and summary statistics
+
+# Since we are doing an ensem
+fx_unde_summary <- fx_unde_out |>
+  mutate(datetime = floor_date(datetime, unit = "day")) |>
+  group_by(datetime, site_id) |>
+  nest() |>
+  inner_join(unde_targets_eval, by = c("datetime", "site_id")) |>
+  mutate(
+    crps = map2_dbl(.x = flux, .y = data, .f = ~ scoringRules::crps_sample(.x, .y$prediction)),
+    summary_stats = map(.x = data, .f = ~ (
+      .x |> reframe(
+        value = stats::quantile(prediction, na.rm = TRUE, probs = c(0.025, 0.10, 0.5, 0.9, .975)),
+        name = c("prediction_q0.025", "prediction_q0.10", "prediction_q0.5", "prediction_q0.90", "prediction_q0.975"),
+        prediction_mean = mean(prediction, na.rm = TRUE),
+        prediction_sd = sd(prediction, na.rm = TRUE)
+      ) |>
+        tidyr::pivot_wider()
+    ))
+  ) |>
+  select(-data) |>
+  unnest(cols = c(summary_stats)) |>
+  mutate(within_TRUE = between(flux, prediction_q0.10, prediction_q0.90)) |>
   ungroup()
+
+# Report the percentage of predictions that fell within the 90% CI (reliability):
+fx_unde_summary |>
+  summarize(reliability = sum(within_TRUE) / n())
 ```
 
-    `summarise()` has grouped output by 'ensemble'. You can override using the
-    `.groups` argument.
+    # A tibble: 1 × 1
+      reliability
+            <dbl>
+    1      0.0645
 
 ``` r
-X <- model.matrix(~ 1 + SOILW + TSOIL, data = fx_drivers_unde_day)
-
-fx_unde_out_day <- fx_drivers_unde_day |>
-  mutate(prediction = ((X %*% coeff_vec)  |>
-    as.numeric() ))
+# Plot the CRPS over time
+ggplot(
+  data = fx_unde_summary,
+  aes(x = datetime, y = crps)
+) +
+  geom_point() +
+  geom_line() +
+  theme_minimal() +
+  labs(
+    x = "Date",
+    y = "CRPS",
+    title = "CRPS scores for UNDE soil flux forecast",
+    subtitle = "Forecast valid: 2025-05-01"
+  )
 ```
+
+![](introducing_soil_flux_files/figure-commonmark/unnamed-chunk-16-1.png)
+
+Clearly this is poorly calibrated, overconfident forecast! The
+reliability (percentage of observations within the 90% confidence
+interval) is quite low.
+
+Now let’s plot our forecast, the 90% confidence interval, with the
+observations:
+
+## Follow on steps
+
+- This forecast just ran at one site. Can you use iteration techniques
+  (i.e. `purrr::map`) to iterate across several sites?
+- Can you try an alternative model? What if you parameterized data from
+  the entire previous year (2024), rather than one month previously?
+- Are there alternative models better than linear regression?
+- What if you computed one-day out forecasts for each day of the month?
+
+## Submitting forecasts
+
+I invite you to participate in this forecasting challenge. All modeling
+approaches are welcome. Here are the steps needed to participate:
+
+1.  Generate a forecast!
+2.  Write the forecast output to a file that follows the [standardized
+    format for the NEON EFI forecast
+    challenge](https://projects.ecoforecast.org/neon4cast-ci/instructions.html#submission-process):
+    `soil_flux-year-month-day-model_id.csv`. Compressed csv files with
+    the csv.gz extension are also accepted. The year, month, and day are
+    the year, month, and day the `reference_datetime` (`horizon = 0`).
+3.  Submit your forecast to `zobitz@augsburg.edu` with the subject line
+    soil_flux-year-month-day-model_id, along with an `R` function to run
+    your forecast (if you want it to be automated)
+4.  Register and describe your model here:
+    [LINK](https://docs.google.com/forms/d/e/1FAIpQLScOnp6q5ODkPAIYplau-eWUE6mPEs4-9loMikOC6ugWgzGTkQ/viewform?usp=sharing&ouid=110173876465247112627).
+    You are not required to register if your forecast submission uses
+    the word “example” in your model_id”. Any forecasts with “example”
+    in the model_id will not be used in forecast evaluation analyses.
+    You can use neon4cast as the challenge for which you are
+    registering.
+5.  Watch your forecast be evaluated as new data are collected.
 
 ### Forecast standards
 
@@ -429,122 +663,30 @@ Challenge](https://projects.ecoforecast.org/neon4cast-ci/instructions.html#forec
 - `prediction`: forecasted value for the parameter in the parameter
   column
 
-To conform to these standards we will need to add some additional
-variables to our data table before submission:
+## Additional resources
 
-``` r
-fx_unde_submission <- fx_unde_out_day |>
-  mutate(duration = 'P1D',
-         site_id = "UNDE",
-         project_id = 'soilflux4cast',
-         model_id = 'linear_jz',
-         variable = 'soil_flux',
-         family = 'ensemble') |>
-  rename(parameter = ensemble) |>
-  select(project_id,model_id,datetime,reference_datetime,
-         duration,site_id,family,parameter,variable,prediction)
-```
+While we have touched on some fundamental ways to start forecasting soil
+fluxes, here as some additional resources to level up your knowledge:
 
-### Model evaluation
+### Soil fluxes
 
-How did our forecast perform? Because we did a hindcast, we can evaluate
-the performance of the forecast:
+- [Modeling soil fluxes with NEON
+  data](https://qubeshub.org/publications/4774/1)
 
-``` r
-### Acquire targets for comparison (for the next month)
-targets_eval <- download_values(
-  variable = "targets",
-  year = "2025",
-  month = "05"  # optional - you can omit if you want values for the entire year
-  ) 
+### Data science skills
 
-# Just get the UNDE site
-unde_targets_eval <- targets_eval |>
-  filter(site_id == "UNDE")
-```
+- [Modern Data Science with R](https://mdsr-book.github.io/mdsr3e/)
+- [R for Data Science](https://r4ds.hadley.nz/)
+- [Environmental Data Science](https://jmzobitz.github.io/eds-text/)
+  *work in progress*
 
-How well did our model do? The following processing pipeline:
+### Ecological forecasting
 
-1.  Groups the forecasts by `datetime` and `site_id`
-2.  Joins to the measured targets from that month.
-3.  Computes the [Continuous Rank Probability Score
-    (CRPS)](https://projects.ecoforecast.org/neon4cast-docs/Evaluation.html)
-    from the `scoringRules` package (because we have an ensemble).
-4.  Computes the summary statistics of the ensemble
-5.  Computes the if the observation points falls within the prediction
-    intervals (90% CI). We can use the scoring rules, grouping the
-    ensemble by day
-
-``` r
-# Nest by the day and site, join the measured targets, and then compute the crps and summary statistics
-
-# Since we are doing an ensem
-fx_unde_summary <- fx_unde_submission |>
-  group_by(datetime,site_id) |>
-  nest() |>
-  inner_join(unde_targets_eval,by=c("datetime" = "startDateTime","site_id")) |>
-  mutate(crps = map2_dbl(.x=flux,.y=data,.f=~scoringRules::crps_sample(.x,.y$prediction)),
-         summary_stats = map(.x=data,.f=~(
-           .x |> reframe(
-             value = stats::quantile(prediction,na.rm=TRUE,probs = c(0.025,0.10,0.5,0.9,.975)),
-             name = c("prediction_q0.025", "prediction_q0.10","prediction_q0.5", "prediction_q0.90","prediction_q0.975"),
-              prediction_mean = mean(prediction, na.rm = TRUE),
-             prediction_sd = sd(prediction, na.rm = TRUE)
-           ) |> 
-             tidyr::pivot_wider()
-           
-           
-         ))) |>
-  select(-data) |>
-  unnest(cols=c(summary_stats)) |>
-  mutate(within_TRUE = between(flux,prediction_q0.10,prediction_q0.90))
-```
-
-Now let’s plot our forecast, the 90% confidence interval, with the
-observations:
-
-``` r
-fx_unde_summary |>
-  ggplot(aes(x=datetime)) +
-  geom_point(aes(y=flux),color='red') +
-  geom_line(aes(y=prediction_q0.5)) +
-  geom_ribbon(aes(ymin=prediction_q0.10,ymax=prediction_q0.90),alpha=0.3) +
-  theme_minimal() +
-  xlab('Date') +
-  ylab('Soil Flux (gC/m2/d)')
-```
-
-![](introducing_soil_flux_files/figure-commonmark/unnamed-chunk-15-1.png)
-
-Clearly this is poorly calibrated, overconfident forecast! The
-reliability (percentage of observations within the 90% confidence
-interval)
-
-## Follow on steps
-
-- This forecast just ran at one site. Can you use iteration techniques
-  (i.e. `purrr::map`) to iterate across all sites?
-- Can you try an alternative model? What if you parameterized data from
-  the entire previous year (2024), rather than one month previously?
-- Are there alternative models better than linear regression?
-
-## Submitting forecasts
-
-1.  Generate a forecast!
-2.  Write the forecast output to a file that follows the [standardized
-    format for the NEON EFI forecast
-    challenge](https://projects.ecoforecast.org/neon4cast-ci/instructions.html#submission-process):
-    `soil_flux-year-month-day-model_id.csv`. Compressed csv files with
-    the csv.gz extension are also accepted. The year, month, and day are
-    the year, month, and day the `reference_datetime` (`horizon = 0`).
-3.  Submit your forecast to `zobitz@augsburg.edu` with the subject line
-    soil_flux-year-month-day-model_id, along with an `R` function to run
-    your forecast (if you want it to be automated)
-4.  Register and describe your model here:
-    [LINK](https://docs.google.com/forms/d/e/1FAIpQLScOnp6q5ODkPAIYplau-eWUE6mPEs4-9loMikOC6ugWgzGTkQ/viewform?usp=sharing&ouid=110173876465247112627).
-    You are not required to register if your forecast submission uses
-    the word “example” in your model_id”. Any forecasts with “example”
-    in the model_id will not be used in forecast evaluation analyses.
-    You can use neon4cast as the challenge for which you are
-    registering.
-5.  Watch your forecast be evaluated as new data are collected.
+- [Introduction to ecological
+  forecasting](https://serc.carleton.edu/eddie/teaching_materials/modules/module5.html)
+- [Understanding uncertainty in ecological
+  forecasts](https://serc.carleton.edu/eddie/teaching_materials/modules/module6.html)
+- [Using data to understand ecological
+  forecasts](https://serc.carleton.edu/eddie/teaching_materials/modules/module7.html)
+- [A Practical Guide to Ecosystem
+  Forecasting](https://frec-5174.github.io/eco4cast-in-R-book/)
