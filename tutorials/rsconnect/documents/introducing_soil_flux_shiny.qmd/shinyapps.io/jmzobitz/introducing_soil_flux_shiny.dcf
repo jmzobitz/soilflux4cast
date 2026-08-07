@@ -1,0 +1,15 @@
+name: introducing_soil_flux_shiny
+title: introducing_soil_flux_shiny
+username: jmzobitz
+account: jmzobitz
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 17676670
+bundleId: 12377185
+url: https://jmzobitz.shinyapps.io/introducing_soil_flux_shiny/
+version: 1
+quarto_version: 1.9.38
+quarto_engines: knitr
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: data/data-process.R|data/sjer.Rda|data/soil-co2.Rda|diffusion.png|introducing_soil_flux_lite.md|introducing_soil_flux_lite.qmd|introducing_soil_flux.bib|introducing_soil_flux.md|introducing_soil_flux.qmd|macrosystems-tm.bib|mathjax.html|module-v2-response.docx|module-v2-response.qmd|module-v2.md|module-v2.qmd|introducing_soil_flux_files|module-v2_files

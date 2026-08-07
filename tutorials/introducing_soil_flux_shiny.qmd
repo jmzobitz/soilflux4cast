@@ -1,0 +1,795 @@
+---
+title: "Introduction to soil flux forecasting - interactive (no fuss)"
+author: "John Zobitz"
+format: 
+  html:
+    embed-resources: true
+server: shiny
+---
+
+# Theme: Soil fluxes
+- **What:** Soil fluxes of carbon (gC m^-2^ d^-1^) derived from Fick's Law of diffusion.
+- **Where:** 47 terrestrial NEON sites that span the diverse ecosystems of the U.S.
+- **When:** Daily forecasts for at least 30-days in the future are accepted at any time. The only requirement is that submissions are predictions of the future at the time the forecast is submitted.
+- **Why:** Soils are one of the largest pools of terrestrial carbon.
+
+All modeling approaches are welcome! This tutorial will take you through developing an forecast using the driver covariates of your choosing with an empirical model.
+
+
+## Prerequisites
+This module assumes you:
+
+1. Know what an ecological forecast is, but perhaps you have limited experience in developing / coding your own forecast.
+2. Have an emerging understanding of soil carbon fluxes are and know what the National Ecological Observatory Network (NEON) is.
+3. Have experience working with empirical models (linear regression).
+
+```{r}
+#| context: setup
+#| message: false
+
+# load up the packages
+library(tidyverse)
+library(glue)
+library(arrow)
+library(terra)
+library(sf)
+library(shiny)
+library(scoringRules)
+
+# Helper function to source from your specific repo
+source_github <- function(file_name) {
+  base_url <- "https://raw.githubusercontent.com/jmzobitz/soilflux4cast/main/"
+  devtools::source_url(paste0(base_url, file_name))
+}
+
+# Now you can source any file by name
+source_github("R/download_values.R")
+source_github("R/noaa_soil_drivers.R")
+
+# The 47 terrestrial NEON sites eligible for the soil flux forecast challenge
+neon_terrestrial_sites <- c(
+  "ABBY", "BARR", "BART", "BLAN", "BONA", "CLBJ", "CPER", "DCFS", "DEJU",
+  "DELA", "DSNY", "GRSM", "GUAN", "HARV", "HEAL", "JERC", "JORN", "KONA",
+  "KONZ", "LAJA", "LENO", "MLBS", "MOAB", "NIWO", "NOGP", "OAES", "ONAQ",
+  "ORNL", "OSBS", "PUUM", "RMNP", "SCBI", "SERC", "SJER", "SOAP", "SRER",
+  "STEI", "STER", "TALL", "TEAK", "TOOL", "TREE", "UKFS", "UNDE", "WOOD",
+  "WREF", "YELL"
+)
+
+# The available driver / covariate columns returned by download_values(variable = "drivers")
+driver_covariate_choices <- c(
+  "Surface Pressure (PRES)" = "PRES",
+  "Soil Temperature (TSOIL)" = "TSOIL",
+  "Soil Water Content (SOILW)" = "SOILW",
+  "Snow Water Equivalent (WEASD)" = "WEASD",
+  "Snow Depth (SNOD)" = "SNOD",
+  "Ice Thickness (ICETK)" = "ICETK"
+)
+driver_covariate_names <- unname(driver_covariate_choices)
+
+# Parse a "a0=1, a1=2.5" style text input into a named list of starting values for nls().
+# Returns an empty list if text is blank/unparseable.
+parse_start_values <- function(text) {
+  out <- list()
+  if (is.null(text) || trimws(text) == "") return(out)
+
+  parts <- strsplit(text, ",")[[1]]
+  for (p in parts) {
+    kv <- strsplit(trimws(p), "=")[[1]]
+    if (length(kv) == 2 && trimws(kv[1]) != "" && !is.na(suppressWarnings(as.numeric(trimws(kv[2]))))) {
+      out[[trimws(kv[1])]] <- as.numeric(trimws(kv[2]))
+    }
+  }
+  out
+}
+
+# Extract the free variable names referenced in a formula's right-hand-side text,
+# split into which ones are known driver covariates vs. which are (presumably) parameters.
+parse_formula_vars <- function(formula_text, covariate_names) {
+  vars <- tryCatch(all.vars(str2lang(formula_text)), error = function(e) character(0))
+  list(
+    covariates = intersect(vars, covariate_names),
+    parameters = setdiff(vars, covariate_names)
+  )
+}
+```
+
+## Drivers
+Driver variables are provided by NOAA's Global Ensemble Forecasting System, acquired through the [`gefs4cast` github repository](https://github.com/eco4cast/gefs4cast). Notably for this project, we have pre-selected NOAA GEFS [driver variables](https://www.nco.ncep.noaa.gov/pmb/products/gens/gec00.t00z.pgrb2a.0p50.f000.shtml) that are known to influence soil surface fluxes:
+
+- `PRES`: Surface Pressure [Pa]
+-	`TSOIL`: Soil Temperature 0-0.1 m below ground [K]
+- `SOILW`: Volumetric Soil Moisture Content 0-0.1 m below ground [Fraction]
+- `WEASD`: Water Equivalent of Accumulated Snow Depth [kg/m^2]
+- `SNOD`: Snow Depth [m] 
+- `ICETK`: Ice Thickness [m]
+
+If you would like additional variables included, please file a [github issue](https://github.com/jmzobitz/soilflux4cast/issues). 
+
+In addition, at a single forecast date, we provide ensemble forecasts for each of the driver variables listed above at each of the terrestrial NEON sites.  At each site, 31 ensemble member forecasts are provided at 3 hr intervals for the first 10 days, and 6 hr intervals for up to 35 days (840 hr horizon). This is analgous to the `neon4cast::noaa_stage3()` function for the [NEON Ecological Forecasting challenges](https://projects.ecoforecast.org/neon4cast-docs/Shared-Forecast-Drivers.html#stage-1).
+
+
+
+## Targets
+The target is a daily total soil flux of carbon (gC m^-2^ d^-1^) derived from half hourly estimates using the [`neonSoilFlux` `R` package](https://cran.r-project.org/web/packages/neonSoilFlux/index.html) and associated publication [LINK](https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210x.70216).  When NEON data are released on the 15th of each month, the `soilflux4cast` package computes daily values for the month previous and stores the data in the `data/targets` on the repository as flat `csv` files.
+
+
+
+## Select a site and covariates
+**Below, you can pick any terrestrial NEON site, any training month/year, any subset of the six driver covariates.  Later on you will fit a model to these data.**
+
+
+```{r}
+#| echo: false
+
+training_month_choices <- format(
+  seq(as.Date("2024-01-01"), as.Date("2026-07-01"), by = "month"),
+  "%Y-%m"
+)
+
+fluidRow(
+  column(
+    6,
+    selectInput(
+      "site", "NEON site:",
+      choices = neon_terrestrial_sites,
+      selected = "UNDE"
+    )
+  ),
+  column(
+    6,
+    selectInput(
+      "training_period", "Training month (YYYY-MM):",
+      choices = training_month_choices,
+      selected = "2025-04"
+    )
+  )
+)
+
+checkboxGroupInput(
+  "covariates", "Driver covariates to plot (and use in a linear model):",
+  choices = driver_covariate_choices,
+  selected = c("TSOIL", "SOILW"),
+  inline = TRUE
+)
+
+```
+
+### Historical drivers and targets at your chosen site
+
+First let's investigate the driver variables and targets for the site/month/year you selected.
+
+```{r}
+#| context: server
+
+training_period_parsed <- reactive({
+  req(input$training_period)
+  parts <- strsplit(input$training_period, "-")[[1]]
+  list(year = as.integer(parts[1]), month = parts[2])
+}) 
+
+drivers <- reactive({
+  # Ensure site, training period, and checked covariates are selected before running
+  req(input$site, input$training_period, input$covariates)
+
+  download_values(
+    variable = "drivers",
+    year = as.character(training_period_parsed()$year),
+    month = training_period_parsed()$month
+  ) |>
+    filter(site_id == input$site)
+}) 
+
+
+targets <- reactive({
+  req(input$site, input$training_period)
+
+  download_values(
+    variable = "targets",
+    year = as.character(training_period_parsed()$year),
+    month = training_period_parsed()$month
+  ) |>
+    filter(site_id == input$site)
+}) 
+
+
+
+```
+
+### Environmental drivers
+
+```{r}
+#| echo: false
+plotOutput("driver_plot")
+```
+
+```{r}
+#| context: server
+
+output$driver_plot <- renderPlot({
+  validate(need(length(input$covariates) > 0, "Select at least one covariate above to plot."))
+  validate(need(nrow(drivers()) > 0, "No driver data returned for this site/month/year combination. Try a different selection."))
+
+  drivers() |>
+    pivot_longer(cols = all_of(input$covariates), names_to = "variable") |>
+    ggplot(aes(x = datetime, y = value)) +
+    geom_line() +
+    geom_point() +
+    facet_wrap(~variable, scales = "free_y", ncol = 2) +
+    theme_minimal() +
+    labs(
+      title = glue("Historical drivers at {input$site}, {input$training_period}"),
+      x = NULL, y = NULL
+    )
+})
+```
+
+### Targets
+
+Next let's take a look at the soil flux targets across this same time frame:
+
+```{r}
+#| echo: false
+plotOutput("targets_plot")
+```
+
+```{r}
+#| context: server
+
+output$targets_plot <- renderPlot({
+  validate(need(nrow(targets()) > 0, "No target data returned for this site/month/year combination. Try a different selection."))
+
+  targets() |>
+    ggplot(aes(x = datetime, y = flux)) +
+    geom_line() +
+    geom_point() +
+    ylab("Soil flux (gC m⁻² d⁻¹)") +
+    xlab(NULL) +
+    theme_minimal()
+})
+```
+
+## Develop an empirical model
+
+Using the environmental driver data and soil flux targets above you are now ready to fit a model! You have two modeling options:
+
+- **Linear model:** pick one or more covariates below and a standard additive linear regression ($flux = a_0 + a_1 x_1 + a_2 x_2 + \dots$) is fit with `lm()`. 
+- **Custom nonlinear formula:** write your own right-hand-side expression in terms of the covariate names (e.g. `TSOIL`, `SOILW`) and whatever parameter names you like (e.g. `a0`, `a1`, `k`); it's fit with `nls()`. This lets you try things like interactions, powers, exponentials, or saturating (Michaelis-Menten-style) responses that a linear model can't capture. **The nonlinear model feature has not been extensively tested. Use with caution.** 
+
+::: {.callout-tip}
+Selecting a checkbox from the environmental covariates above will automatically include that covariate in your linear model. For a nonlinear model it will automaically select whatever covariate names appear in your formula.
+:::
+
+Either way, the model is trained (parameterized) on **the twelve months preceding the month and year you selected above**. Once the model is fit, then it is evaluated against the following month's soil fluxes in a *hindcasting* evaluation.
+
+
+```{r}
+#| echo: false
+
+
+radioButtons(
+  "model_type", "Model type:",
+  choices = c("Linear model (lm)" = "linear", "Custom nonlinear formula (nls)" = "nonlinear"),
+  selected = "linear",
+  inline = TRUE
+)
+
+conditionalPanel(
+  condition = "input.model_type == 'nonlinear'",
+  textInput(
+    "formula_text",
+    "Formula right-hand side (use covariate names above and any parameter names you like):",
+    value = "a0 + a1 * TSOIL + a2 * SOILW",
+    width = "100%"
+  ),
+  textInput(
+    "start_values",
+    "Starting values for parameters (optional, e.g. a0=0, a1=1, a2=1 — unlisted parameters default to 1):",
+    value = "",
+    width = "100%"
+  ),
+  helpText(
+    "Example formulas: 'a0 + a1*TSOIL + a2*SOILW^2', 'a0 + a1*TSOIL*SOILW', ",
+    "'a0 / (1 + exp(-a1*(TSOIL - a2)))'. The covariates you use here don't have to match ",
+    "the checkboxes above -- reference any of PRES, TSOIL, SOILW, WEASD, SNOD, ICETK."
+  )
+)
+
+actionButton("run_forecast", "Run & evaluate forecast", class = "btn-primary")
+```
+
+::: {.callout-note}
+Nothing runs until you press **Run & evaluate forecast**. Downloading and fitting can take a few seconds, especially the ensemble forecast drivers. Please be patient.
+:::
+
+```{r}
+#| context: server
+
+# Helper: subtract N months from a (year, month) pair, return list(year, month).
+subtract_months <- function(year, month_int, n) {
+  total <- (year - 1) * 12 + month_int - n
+  list(year = total %/% 12 + 1, month = sprintf("%02d", total %% 12 + 1))
+}
+
+used_covariates <- eventReactive(input$run_forecast, {
+  if (input$model_type == "linear") {
+    input$covariates
+  } else {
+    parse_formula_vars(input$formula_text, driver_covariate_names)$covariates
+  }
+})
+
+
+
+# All N training months (most-recent first), as a list of list(year, month).
+training_months_list <- reactive({
+  #req(input$n_train_months)
+  m <- as.integer(training_period_parsed()$month)
+  y <- training_period_parsed()$year
+  #lapply(seq_len(input$n_train_months), function(n) subtract_months(y, m, n))
+  lapply(seq_len(12), function(n) subtract_months(y, m, n))
+}) 
+
+joined_data <- eventReactive(input$run_forecast, {
+  # Get the covariates that we use
+  used_cov <- used_covariates()
+
+  # Download drivers + targets for every training month and row-bind them.
+  train_months <- training_months_list()
+
+  all_drivers <- purrr::map_dfr(train_months, function(tm) {
+    download_values(variable = "drivers", year = as.character(tm$year), month = tm$month) |>
+      filter(site_id == input$site)
+  })
+
+  all_targets <- purrr::map_dfr(train_months, function(tm) {
+    download_values(variable = "targets", year = as.character(tm$year), month = tm$month) |>
+      filter(site_id == input$site)
+  })
+
+  joined <- all_targets |>
+    inner_join(all_drivers, by = c("site_id", "datetime")) |>
+    select(datetime, flux, all_of(used_cov)) |>
+    drop_na()
+
+  validate(need(nrow(joined) > 5, "Not enough overlapping driver/target data to fit a model. Try a different site/month/year."))
+
+  joined
+})
+
+
+
+
+
+formula_parameters <- eventReactive(input$run_forecast, {
+  parse_formula_vars(input$formula_text, driver_covariate_names)$parameters
+})
+
+
+model_fit <- eventReactive(input$run_forecast, {
+  used_cov <- used_covariates()
+  joined <- joined_data()
+
+  validate(need(
+    length(used_cov) > 0,
+    if (input$model_type == "linear") {
+      "Select at least one covariate to fit a linear model."
+    } else {
+      "Your formula doesn't reference any known covariates (PRES, TSOIL, SOILW, WEASD, SNOD, ICETK)."
+    }
+  ))
+
+
+  if (input$model_type == "linear") {
+    form <- as.formula(paste("flux ~", paste(used_cov, collapse = " + ")))
+    fit <- lm(form, data = joined)
+  } else {
+    validate(need(trimws(input$formula_text) != "", "Enter a formula to fit."))
+
+    params <- formula_parameters()
+    validate(need(length(params) > 0, "Your formula doesn't contain any free parameters to fit (e.g. a0, a1, ...)."))
+
+    form <- as.formula(paste("flux ~", input$formula_text))
+
+    start_supplied <- parse_start_values(input$start_values)
+    start_supplied <- start_supplied[names(start_supplied) %in% params]
+    start_list <- setNames(as.list(rep(1, length(params))), params)
+    start_list[names(start_supplied)] <- start_supplied
+
+    fit <- tryCatch(
+      nls(form, data = joined, start = start_list),
+      error = function(e) {
+        validate(paste0(
+          "Model failed to fit: ", conditionMessage(e),
+          ". Try different starting values or a simpler formula."
+        ))
+      }
+    )
+  }
+
+  joined <- joined |>
+    mutate(fitted = as.numeric(predict(fit, newdata = joined)))
+
+  list(
+    fit = fit,
+    used_covariates = used_cov,
+    training_data = joined
+  )
+})
+
+# Get the next values
+next_period <- eventReactive(input$run_forecast, {
+  m <- as.integer(training_period_parsed()$month)
+  y <- training_period_parsed()$year
+
+  if (m == 12) {
+    list(month = "01", year = y + 1)
+  } else {
+    list(month = sprintf("%02d", m + 1), year = y)
+  }
+})
+
+forecast_drivers <- eventReactive(input$run_forecast, {
+  forecast_date <- glue("{next_period()$year}-{next_period()$month}-01")
+
+  noaa_soil_drivers(
+    forecast_date = forecast_date,
+    site = input$site
+  )
+})
+
+```
+
+### Fitting diagnostics
+
+Information and statistics from our model fit are shown below:
+
+```{r}
+#| echo: false
+tableOutput("coeff_table")
+textOutput("model_summary_text")
+```
+
+```{r}
+#| context: server
+
+output$coeff_table <- renderTable({
+  broom::tidy(model_fit()$fit)
+})
+
+output$model_summary_text <- renderText({
+  fit <- model_fit()$fit
+  rmse <- sqrt(mean(residuals(fit)^2, na.rm = TRUE))
+  model_label <- if (input$model_type == "linear") "Linear model (lm)" else glue("Custom nonlinear model: flux ~ {input$formula_text}")
+
+  glue(
+    "{model_label} | Covariates used: {paste(model_fit()$used_covariates, collapse = ', ')} | Training RMSE: {round(rmse, 3)}"
+  )
+})
+```
+
+## Forecast to the next month
+To build a forecast into the next month, we first need to acquire the forecasted values of our driver variables at our chosen site for a given date.  For simplicity, we are just going to develop a forecasts starting at the first day of the next month that you selected above.
+
+### Forecast drivers
+Let's examine both the forecast drivers for each sub-daily ensemble spread for each selected driver, shown in the following plots:
+
+```{r}
+#| echo: false
+plotOutput("driver_raw_plot", height = "auto")
+```
+
+```{r}
+#| context: server
+
+output$driver_raw_plot <- renderPlot({
+  fd <- forecast_drivers()
+  used_cov <- model_fit()$used_covariates
+
+  validate(need(nrow(fd) > 0, "No forecast driver data was returned. Try a different site/month/year."))
+
+  fd |>
+    pivot_longer(cols = all_of(used_cov), names_to = "variable") |>
+    ggplot(aes(x = datetime, y = value, group = ensemble)) +
+    geom_line(alpha = 0.2, color = "steelblue") +
+    facet_wrap(~variable, scales = "free_y", ncol = 2) +
+    theme_minimal() +
+    labs(
+      title = glue("Raw forcast drivers at {input$site} — {next_period()$month}/{next_period()$year}"),
+      x = "Date", y = NULL
+    )
+}, height = function() 220 * ceiling(length(model_fit()$used_covariates) / 2))
+```
+
+The spread in these values gives a sense of how much uncertainty is in the driving conditions themselves before we even run the model. It may be better to show a confidence interval rather than each ensemble member. We are going to aggregate the forecast values of each day and compute the median and 90% confidence interval. 
+
+We will display both the last month of the observed (historical) drivers used for model fitting along with the forecast ensemble. The blue line below shows the observed (historical) driver values; the black line is the ensemble median for the forecast period, with a shaded 90% confidence interval envelope:
+
+```{r}
+#| context: server
+
+driver_forecast_summary <- eventReactive(input$run_forecast, {
+  used_cov <- model_fit()$used_covariates
+  fd <- forecast_drivers()
+
+  validate(need(nrow(fd) > 0, "No forecast driver data returned."))
+
+  fd |>
+    mutate(datetime = floor_date(datetime, unit = "day")) |>
+    group_by(datetime) |>
+    summarize(
+      across(
+        all_of(used_cov),
+        list(
+          q10  = ~ quantile(.x, 0.10, na.rm = TRUE),
+          q50  = ~ quantile(.x, 0.50, na.rm = TRUE),
+          q90  = ~ quantile(.x, 0.90, na.rm = TRUE)
+        ),
+        .names = "{.col}___{.fn}"
+      ),
+      .groups = "drop"
+    )
+})
+```
+
+```{r}
+#| echo: false
+plotOutput("driver_comparison_plot", height = "auto")
+```
+
+```{r}
+#| context: server
+
+output$driver_comparison_plot <- renderPlot({
+  used_cov <- model_fit()$used_covariates
+
+  # Training-period observed drivers (daily; already at daily resolution from download_values)
+  train_long <- drivers() |>
+    pivot_longer(cols = all_of(used_cov), names_to = "variable") |>
+    transmute(datetime, variable, q50 = value, period = "Training (observed)")
+
+  # Forecast-period ensemble summary: pivot the wide summary to long
+  fx_summary <- driver_forecast_summary()
+  fx_long <- fx_summary |>
+    pivot_longer(
+      cols = -datetime,
+      names_to = c("variable", ".value"),
+      names_sep = "___"
+    ) |>
+    mutate(period = "Forecast (ensemble)")
+
+  ggplot() +
+    geom_ribbon(
+      data = fx_long,
+      aes(x = datetime, ymin = q10, ymax = q90),
+      fill = "black", alpha = 0.15
+    ) +
+    geom_line(data = train_long, aes(x = datetime, y = q50, color = period)) +
+    geom_line(data = fx_long, aes(x = datetime, y = q50, color = period)) +
+    scale_color_manual(
+      name = NULL,
+      values = c("Training (observed)" = "steelblue", "Forecast (ensemble)" = "black")
+    ) +
+    facet_wrap(~variable, scales = "free_y", ncol = 2) +
+    theme_minimal() +
+    theme(legend.position = "bottom") +
+    labs(
+      title = glue(
+        "Driver comparison: training ({input$training_period}) vs. forecast ({next_period()$month}/{next_period()$year}) at {input$site}"
+      ),
+      x = NULL, y = NULL
+    )
+}, height = function() 220 * ceiling(length(model_fit()$used_covariates) / 2))
+```
+
+
+### Forecast model
+Now that we have a sense for the forecast variability in our environmental drivers, let's generate predictions with our fitted model. Let's take a look at the raw (sub-daily) ensemble forecast:
+
+
+```{r}
+#| echo: false
+plotOutput("forecast_raw_plot")
+```
+
+```{r}
+#| context: server
+
+forecast_out <- eventReactive(input$run_forecast, {
+  fd <- forecast_drivers()
+
+  validate(need(nrow(fd) > 0, "No forecast driver data was returned. Try a different site/month/year."))
+
+  fd |>
+    mutate(prediction = as.numeric(predict(model_fit()$fit, newdata = fd)))
+})
+
+output$forecast_raw_plot <- renderPlot({
+  validate(need(nrow(forecast_out()) > 0, "No forecast driver data was returned. Try a different site/month/year."))
+
+  forecast_out() |>
+    ggplot(aes(x = datetime, y = prediction, group = ensemble)) +
+    geom_line() +
+    theme_minimal() +
+    labs(
+      title = glue("Raw ensemble forecast at {input$site}"),
+      x = "Date", y = "Forecast soil flux (gC m⁻² d⁻¹)"
+    )
+})
+```
+
+Similar to what we did with the forecast driver variables, we will calculate a 90% confidence interval of the forecast values for each forecast day. Next let's plot the training-period data alongside the forecast &mdash; the observed flux and fitted values from the last month you trained on (in blue), plus the forecast median, 90% confidence interval, and observed flux for the evaluation month (in black/red, as before):
+
+
+```{r}
+#| echo: false
+plotOutput("evaluation_plot")
+```
+
+
+```{r}
+#| context: server
+
+targets_eval <- eventReactive(input$run_forecast, {
+  eval_data <- download_values(
+    variable = "targets",
+    year = as.character(next_period()$year),
+    month = next_period()$month
+  ) |>
+    filter(site_id == input$site)
+  
+    validate(need(nrow(eval_data) > 0, "No overlapping observed targets were found for the evaluation month. Try a different training month/year."))
+
+  eval_data
+})
+
+forecast_out_day <- eventReactive(input$run_forecast, {
+  forecast_out() |>
+      mutate(datetime = floor_date(datetime, unit = "day")) |>
+  group_by(datetime) |>
+  summarize(
+    across(
+      c("prediction"),
+      list(
+        q10  = ~ quantile(prediction, 0.10, na.rm = TRUE),
+        q50  = ~ quantile(prediction, 0.50, na.rm = TRUE),
+        q90  = ~ quantile(prediction, 0.90, na.rm = TRUE)
+      ),
+      .names = "{.col}_{.fn}"
+    ),
+    .groups = "drop"
+  ) |>
+  mutate(period = "Forecast (ensemble)")
+
+})
+
+
+output$evaluation_plot <- renderPlot({
+  
+  m <- as.integer(training_period_parsed()$month)
+  y <- as.integer(training_period_parsed()$year)
+  
+  train_df <- model_fit()$training_data |>
+    transmute(datetime = datetime, observed = flux, fitted = fitted) |>
+    filter(lubridate::month(datetime) == m, lubridate::year(datetime) == y)
+
+  eval_df <- forecast_out_day()
+  eval_obs_df <- targets_eval()
+  
+  ggplot() +
+    geom_ribbon(
+      data = eval_df,
+      aes(x = datetime, ymin = prediction_q10, ymax = prediction_q90),
+      fill = "black", alpha = 0.2
+    ) +
+    geom_point(data = train_df, aes(x = datetime, y = observed, color = "Training data (observed)")) +
+    geom_line(data = train_df, aes(x = datetime, y = fitted, color = "Training data (fitted)")) +
+    geom_line(data = eval_df, aes(x = datetime, y = prediction_q50, color = "Forecast (median)")) +
+    geom_point(data = eval_obs_df, aes(x = datetime, y = flux, color = "Evaluation (observed)")) +
+    scale_color_manual(
+      name = NULL,
+      values = c(
+        "Training data (observed)" = "steelblue",
+        "Training data (fitted)" = "steelblue",
+        "Forecast (median)" = "black",
+        "Evaluation (observed)" = "red"
+      )
+    ) +
+    theme_minimal() +
+    theme(legend.position = "bottom") +
+    xlab("Date") +
+    ylab("Soil Flux (gC m⁻² d⁻¹)") +
+    labs(title = glue("Training ({training_period_parsed()$month}/{training_period_parsed()$year}) vs. forecast evaluation ({next_period()$month}/{next_period()$year}) at {input$site}"))
+})
+```
+
+
+### Model evaluation
+
+How did our forecast perform? Because we did a hindcast, we can evaluate the performance of the forecast against the observed targets for the month we forecasted into:
+
+```{r}
+#| context: server
+
+
+forecast_summary <- eventReactive(input$run_forecast, {
+  forecast_out() |>
+     mutate(
+      site_id = input$site) |>
+    group_by(datetime, site_id) |>
+    nest() |>
+    inner_join(targets_eval(), by = c("datetime", "site_id"))
+
+})
+
+
+
+forecast_stats <- eventReactive(input$run_forecast, {
+  forecast_summary() |>
+    mutate(
+      crps = map2_dbl(.x = flux, .y = data, .f = ~ scoringRules::crps_sample(.x, .y$prediction)),
+      summary_stats = map(.x = data, .f = ~ (
+        .x |> reframe(
+          value = stats::quantile(prediction, na.rm = TRUE, probs = c(0.025, 0.10, 0.5, 0.9, .975)),
+          name = c("prediction_q0.025", "prediction_q0.10", "prediction_q0.5", "prediction_q0.90", "prediction_q0.975"),
+          prediction_mean = mean(prediction, na.rm = TRUE),
+          prediction_sd = sd(prediction, na.rm = TRUE)
+        ) |>
+          tidyr::pivot_wider()
+      ))
+    ) |>
+    select(-data) |>
+    unnest(cols = c(summary_stats)) |>
+    mutate(within_90 = between(flux, prediction_q0.10, prediction_q0.90)) |>
+    ungroup()
+
+
+})
+
+
+```
+
+
+One quick measure of a forecast is it's reliability, or what is the proportion of the time that the hindcast values fall within the 90% confidence interval. The forecast you developed had the following reliability:
+
+```{r}
+#| echo: false
+tableOutput("evaluation_summary_table")
+```
+
+```{r}
+#| context: server
+
+output$evaluation_summary_table <- renderTable({
+  forecast_stats() |>
+    summarize(
+      reliability = 100*mean(within_90, na.rm = TRUE)
+    )
+})
+```
+
+A well-calibrated forecast has roughly 90% reliability; if you see a much lower percentage, the forecast is overconfident. Try a few different sites, months, and years, and see how the calibration changes!
+
+## Follow on steps
+- Can you try an alternative linear model?
+- Are there sites that could be modified?
+- Are there any promising nonlinear models to try?
+
+## Additional resources
+While we have touched on some fundamental ways to start forecasting soil fluxes, here as some additional resources to level up your knowledge:
+
+### Soil fluxes
+- [Modeling soil fluxes with NEON data](https://qubeshub.org/publications/4774/1)
+- [Introduction to soil flux forecasting - scaffolded (guided tutorial)](https://github.com/jmzobitz/soilflux4cast/blob/main/tutorials/introducing_soil_flux_lite.md)
+
+### Data science skills
+- [Modern Data Science with R](https://mdsr-book.github.io/mdsr3e/)
+- [R for Data Science](https://r4ds.hadley.nz/)
+- [Environmental Data Science](https://jmzobitz.github.io/eds-text/)  *work in progress*
+
+
+### Ecological forecasting
+- [Introduction to ecological forecasting](https://serc.carleton.edu/eddie/teaching_materials/modules/module5.html)
+- [Understanding uncertainty in ecological forecasts](https://serc.carleton.edu/eddie/teaching_materials/modules/module6.html)
+- [Using data to understand ecological forecasts](https://serc.carleton.edu/eddie/teaching_materials/modules/module7.html)
+- [A Practical Guide to Ecosystem Forecasting](https://frec-5174.github.io/eco4cast-in-R-book/)

@@ -402,20 +402,9 @@ Similarly, we will use each of the ensemble members to forecast soil
 flux one month ahead.
 
 ``` r
-# Now we are ready to predict with these forecast drivers
-# Create prediction matrix (include intercept by adding a column of 1)
-
-X <- model.matrix(~ 1 + SOILW + TSOIL, data = fx_drivers_unde)
-
-# Set the model coefficients as a vector so we can predict.
-coeff_vec <- coeff |>
-  select(term, estimate) |>
-  deframe()
-
-# Calculate the predicted forecasts
+# Now we are ready to predict with these new forecast drivers
 fx_unde_out <- fx_drivers_unde |>
-  mutate(prediction = ((X %*% coeff_vec) |>
-    as.numeric()))
+   mutate(prediction = as.numeric(predict(lm_fit, newdata = fx_drivers_unde)))
 ```
 
 How did the forecasts do? Let’s take a look:
