@@ -257,7 +257,7 @@ targets_month <- download_values("targets",curr_year,month = curr_month)
 # Acquire and download the model and
 
 joined_vars_month <- targets_month |>
-  inner_join(drivers_month,by=c("site_id","startDateTime"="datetime")) |>
+  inner_join(drivers_month,by=c("site_id","datetime")) |>
   mutate(TSOIL10 = (TSOIL - 273.15-10)/10,
          TSOIL = TSOIL - 273.15,
          ln_flux = log(flux),

@@ -12,7 +12,7 @@
 #' @import dplyr
 #' @import tidyr
 #'
-#' @returns a tible of fluxes with their site_id, startDateTime, flux, and flux_err
+#' @returns a tible of fluxes with their site_id, datetime, flux, and flux_err
 #' @export
 #'
 #' @examples
@@ -55,7 +55,8 @@ targets_available <- function(dates=NULL) {
       .f = ~ readr::read_csv(.x, show_col_types = FALSE)
     )) |>
     dplyr::select(data) |>
-    tidyr::unnest(cols = c(data))
+    tidyr::unnest(cols = c(data)) |>
+    dplyr::rename(datetime = startDateTime)
     
   return(download_files)
   
