@@ -121,7 +121,7 @@ targets <- targets_available()
 # Now join the two together, by siteID and date, nesting them by site
 
 joined_vars <- targets |>
-  inner_join(drivers, by=c("site_id","startDateTime"="datetime")) |> 
+  inner_join(drivers, by=c("site_id","datetime")) |> 
   drop_na() |>
   mutate(TSOIL = TSOIL - 273.15) |>
   group_by(site_id) |>
@@ -189,7 +189,7 @@ targets <- download_values("targets",year_before)
 # now join by site and day
 
 joined_vars <- targets |>
-  inner_join(drivers,by=c("site_id","startDateTime"="datetime")) |>
+  inner_join(drivers,by=c("site_id","datetime")) |>
   mutate(TSOIL10 = (TSOIL - 273.15 - 10)/10,
          ln_flux = log(flux),
          ln_ok = ((!is.na(ln_flux) & is.finite(ln_flux) & 
@@ -376,7 +376,7 @@ eval_data <- driver_data |>
 
 # Now ready to map!
 joined_vars_month <- targets_month |>
-  inner_join(drivers_month,by=c("site_id","startDateTime"="datetime")) |>
+  inner_join(drivers_month,by=c("site_id","datetime")) |>
   mutate(
          TSOIL = TSOIL - 273.15
          ) |>
