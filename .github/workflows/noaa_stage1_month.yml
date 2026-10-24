@@ -41,7 +41,6 @@ jobs:
             echo "mode=matrix" >> $GITHUB_OUTPUT
 
             # Build month sequence
-            # Convert to 1st of month and loop until reaching end month
             s_date="${start}-01"
             e_date="${end}-01"
 
@@ -88,15 +87,25 @@ jobs:
         with:
           r-version: '4.5.0'
 
-      - name: Install system dependencies for terra
+      - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libudunits2-dev libgdal-dev libproj-dev libgeos-dev
+          sudo apt-get install -y \
+            libgit2-dev \
+            cmake \
+            gdal-bin \
+            libgdal-dev \
+            libcurl4-openssl-dev \
+            libx11-dev \
+            pandoc \
+            libudunits2-dev \
+            libproj-dev \
+            libgeos-dev
 
-      - name: Restore R packages from renv.lock
+      - name: Setup renv and restore packages
+        uses: r-lib/actions/setup-renv@v2
         env:
           GITHUB_PAT: ${{ secrets.PAT_TOKEN }}
-        run: Rscript -e 'renv::restore(prompt = FALSE)'
 
       - name: Run NOAA script for this month
         run: |
